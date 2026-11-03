@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Edytor map SS13</title>
+<link rel="stylesheet" href="styl.css">
+</head>
+<body>
+<canvas id="plotno"></canvas>
+
+<div id="gora" class="panel">
+  <span class="tytul">Edytor map</span>
+  <button id="b-otworz" title="Otwórz mapę">Otwórz</button>
+  <button id="b-zapisz" title="Zapisz (Ctrl+S)">Zapisz</button>
+  <span class="sep"></span>
+  <button id="b-cofnij" title="Cofnij (Ctrl+Z)">↶</button>
+  <button id="b-ponow" title="Ponów (Ctrl+Y)">↷</button>
+  <span class="sep"></span>
+  <span id="poziomy"></span>
+  <span class="sep"></span>
+  <span id="nazwa-mapy" class="przygaszone">nie wczytano mapy</span>
+</div>
+
+<div id="warstwy" class="panel">
+  <div class="naglowek">Widok</div>
+  <label><input type="checkbox" data-w="podloze" checked> Podłoże</label>
+  <label><input type="checkbox" data-w="obiekty" checked> Obiekty</label>
+  <label><input type="checkbox" data-w="dekale" checked> Dekale</label>
+  <label><input type="checkbox" data-w="rury" checked> Rury</label>
+  <label><input type="checkbox" data-w="kable" checked> Kable</label>
+  <label><input type="checkbox" data-w="pomocnicze" checked> Pomocnicze</label>
+  <label><input type="checkbox" data-w="obszary"> Obszary</label>
+  <label><input type="checkbox" id="w-siatka"> Siatka</label>
+</div>
+
+<div id="architekt" class="ukryty">
+  <div id="kategorie" class="panel"></div>
+  <div id="siatka-panel" class="panel ukryty">
+    <div class="pasek">
+      <span id="kat-nazwa" class="naglowek"></span>
+      <input id="szukaj" type="search" placeholder="Szukaj…" autocomplete="off">
+      <label class="przygaszone"><input type="checkbox" id="wszystkie"> wszystkie</label>
+    </div>
+    <div id="podgrupy"></div>
+    <div id="przyciski"></div>
+  </div>
+</div>
+
+<div id="inspekcja" class="panel ukryty"></div>
+<div id="info" class="panel ukryty"></div>
+<div id="podpowiedz" class="ukryty"></div>
+
+<div id="dol" class="panel">
+  <button id="b-architekt" class="duzy">Architekt</button>
+  <button id="b-rozbiorka" class="duzy">Rozbiórka</button>
+  <button id="b-wskaz" class="duzy">Inspekcja</button>
+  <span class="sep"></span>
+  <span class="przygaszone skroty">LPM stawia · PPM anuluje · Q/E obrót · WASD/środkowy przycisk przesuwa · kółko przybliża</span>
+</div>
+
+<div id="okno-map" class="okno ukryty">
+  <div class="panel okno-tresc">
+    <div class="pasek"><span class="naglowek">Otwórz mapę</span><input id="szukaj-mapy" type="search" placeholder="Filtruj…" autocomplete="off"><button id="zamknij-mapy">✕</button></div>
+    <div id="lista-map"></div>
+  </div>
+</div>
+
+<div id="ladowanie" class="okno ukryty"><div class="panel okno-tresc"><span id="ladowanie-tekst">Wczytywanie…</span></div></div>
+<div id="komunikat" class="ukryty"></div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
