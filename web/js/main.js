@@ -4,6 +4,7 @@ import { wczytajTypy, wszystkie, zmienne, ileUzyc, korzen, zmienneAtomu } from "
 import { Widok, ikonkaTypu, kolorObszaru } from "./render.js";
 import { nowyAtom, poPostawieniu, mozna, poRozbiorce, bezAtomu, obrocony, obrot, Historia } from "./edycja.js";
 import { autolacz, laczySie } from "./polaczenia.js";
+import { initSamouczek, zdarzenie, pokazSamouczek } from "./samouczek.js";
 
 const $ = (s) => document.querySelector(s);
 const plotno = $("#plotno");
@@ -108,6 +109,7 @@ function pokazKategorie() {
 
 function wybierzKategorie(id) {
   stan.kategoria = id;
+  if (id) zdarzenie("kategoria", { id });
   stan.podgrupa = null;
   $("#szukaj").value = "";
   for (const b of document.querySelectorAll("#kategorie button")) b.classList.toggle("wlaczony", b.dataset.id === id);
@@ -195,7 +197,7 @@ async function zapiszSzablon() {
   if (!nazwa) return;
   const plik = nazwa.trim().replace(/[^\w\-ąćęłńóśźżĄĆĘŁŃÓŚŹŻ ]/g, "_").slice(0, 80) + ".json";
   const odp = await fetch("/api/szablon?plik=" + encodeURIComponent(plik), { method: "POST", body: JSON.stringify({ nazwa: nazwa.trim(), szer: s.szer, wys: s.wys, kafelki: s.kafelki }) });
-  if (!odp.ok) { komunikat("Nie zapisano szablonu: " + ((await odp.json()).blad || odp.status), true); return; }
+  if (!odp.ok) { komunikat("Nie zapisano szablonu: " + ((await odp.json().catch(() => ({}))).blad || odp.status), true); return; }
   await wczytajSzablony();
   komunikat(`Zapisano szablon „${nazwa}”`);
   if (stan.kategoria === "szablony") pokazSzablony();
@@ -278,6 +280,8 @@ function anulujNarzedzie() {
 function odswiezPrzyciskiNarzedzi() {
   const n = stan.narzedzie;
   $("#b-rozbiorka").classList.toggle("wlaczony", n?.rodzaj === "rozbiorka");
+  $("#b-przenies").classList.toggle("wlaczony", n?.rodzaj === "przenies");
+  $("#b-podloga").classList.toggle("wlaczony", n?.rodzaj === "podloga");
   $("#b-pokoj").classList.toggle("wlaczony", n?.rodzaj === "pokoj");
   $("#b-kopiuj").classList.toggle("wlaczony", n?.rodzaj === "kopiuj");
   $("#b-wklej").classList.toggle("wlaczony", n?.rodzaj === "wklej");
@@ -374,6 +378,7 @@ async function zapisz() {
     if (!odp.ok) throw new Error(w.blad || odp.status);
     ustawZmiany(false);
     komunikat("Zapisano " + stan.mapa.plik);
+    zdarzenie("zapisz");
   } catch (e) {
     komunikat("Zapis nie powiódł się: " + e.message, true);
   } finally {
@@ -412,6 +417,7 @@ function cofnij() {
   if (!w) return;
   historia.naprzod.push(w);
   zastosujHistorie(w, -1);
+  zdarzenie("cofnij");
 }
 function ponow() {
   const w = historia.naprzod.pop();
@@ -462,8 +468,10 @@ function biezacePola() {
 function projekt() {
   const n = stan.narzedzie;
   if (n?.rodzaj === "wklej") return polaWklejania(n.schowek);
+  if (n?.rodzaj === "przenies" && n.chwyt) return polaPrzenoszenia(n.chwyt);
   const pola = biezacePola();
   if (n?.rodzaj === "pokoj") {
+    if (!stan.kursor) return [];
     const p = stan.przeciaganie;
     const s0 = p ? p.start : stan.kursor;
     const x0 = Math.min(s0.x, stan.kursor.x), x1 = Math.max(s0.x, stan.kursor.x);
@@ -515,6 +523,21 @@ function ustawSchowek(s) {
   $("#b-zapisz-szablon").disabled = !s;
 }
 
+// Przenoszony fragment trzymany za punkt, w którym puszczono mysz przy zaznaczaniu.
+function polaPrzenoszenia(c) {
+  const k = stan.kursor;
+  if (!k) return [];
+  return c.schowek.kafelki
+    .map((t) => ({ x: k.x - c.ux + t.dx, y: k.y - c.uy + t.dy, atomy: t.atomy }))
+    .filter((p) => stan.mapa.wewnatrz(p.x, p.y));
+}
+
+const KOSMOS = "/turf/open/space/basic";
+const naKosmos = (atomy) => {
+  const obszar = atomy.find(jestObszarem);
+  return [{ typ: KOSMOS, zm: [] }, obszar || { typ: "/area/space", zm: [] }];
+};
+
 function wklejNa(atomyCelu, atomySchowka) {
   const obszarCelu = atomyCelu.find(jestObszarem);
   const reszta = atomySchowka.filter((a) => !jestObszarem(a));
@@ -532,13 +555,52 @@ function wykonaj() {
     stan.narzedzie = { rodzaj: "wklej", schowek: s };
     odswiezPrzyciskiNarzedzi();
     komunikat(`Skopiowano ${s.szer}×${s.wys}. Kliknij, żeby wkleić (PPM kończy).`);
+    zdarzenie("kopiuj");
     return;
   }
+  if (n.rodzaj === "przenies") {
+    if (!n.chwyt) {
+      // pierwszy krok: zaznaczenie i „podniesienie”
+      const s = kopiuj(pola);
+      if (!s || !s.kafelki.length) { komunikat("Nic do przeniesienia"); return; }
+      const x0 = Math.min(...pola.map((p) => p.x)), y0 = Math.min(...pola.map((p) => p.y));
+      n.chwyt = { schowek: s, x0, y0, ux: stan.kursor.x - x0, uy: stan.kursor.y - y0 };
+      komunikat("Podniesiono fragment. Kliknij w nowe miejsce, PPM anuluje.");
+      widok.rysuj();
+      return;
+    }
+    // drugi krok: źródło staje się kosmosem, fragment ląduje pod kursorem (razem z obszarami)
+    const c = n.chwyt;
+    historia.zacznij();
+    for (const t of c.schowek.kafelki) {
+      const x = c.x0 + t.dx, y = c.y0 + t.dy;
+      zmienKafelek(x, y, [{ typ: KOSMOS, zm: [] }, { typ: "/area/space", zm: [] }]);
+    }
+    for (const { x, y, atomy: wklejane } of pola) {
+      const obszar = wklejane.find(jestObszarem) || stan.mapa.atomy(x, y, widok.z).find(jestObszarem);
+      zmienKafelek(x, y, [...wklejane.filter((a) => !jestObszarem(a)), ...(obszar ? [obszar] : [])]);
+    }
+    if (historia.biezaca?.size) ustawZmiany(true);
+    historia.zakoncz();
+    stan.narzedzie = { rodzaj: "przenies" };
+    zdarzenie("przenies");
+    pokazInspekcje();
+    widok.rysuj();
+    return;
+  }
+  const calkiem = n.rodzaj === "rozbiorka" && stan.przeciaganie?.shift;
   historia.zacznij();
   for (const { x, y, atom, atomy: wklejane } of pola) {
     const atomy = stan.mapa.atomy(x, y, widok.z);
     let nowe = null;
-    if (n.rodzaj === "rozbiorka") nowe = poRozbiorce(atomy);
+    if (calkiem) nowe = naKosmos(atomy);
+    else if (n.rodzaj === "rozbiorka") nowe = poRozbiorce(atomy);
+    else if (n.rodzaj === "podloga") {
+      // tylko podłoga (nie ściany i nie kosmos) – obiekty i obszar zostają
+      const turf = atomy.find((a) => a.typ.startsWith("/turf"));
+      if (!turf || !turf.typ.startsWith("/turf/open") || turf.typ.startsWith("/turf/open/space")) continue;
+      nowe = atomy.map((a) => (a === turf ? { typ: KOSMOS, zm: [] } : a));
+    }
     else if (n.rodzaj === "wklej") nowe = wklejNa(atomy, wklejane);
     else {
       if (!mozna(atomy, atom)) continue;
@@ -546,8 +608,10 @@ function wykonaj() {
     }
     if (nowe) zmienKafelek(x, y, nowe);
   }
-  if (historia.biezaca?.size) ustawZmiany(true);
+  const ile = historia.biezaca?.size || 0;
+  if (ile) ustawZmiany(true);
   historia.zakoncz();
+  if (ile) zdarzenie(calkiem ? "wyczysc" : n.rodzaj, { typ: n.typ, ile, kierunek: stan.kierunek });
   pokazInspekcje();
   widok.rysuj();
 }
@@ -586,14 +650,24 @@ widok.nakladki.push((g, w) => {
     }
     return;
   }
+  if (n.rodzaj === "przenies" && n.chwyt) {
+    // miejsce, z którego fragment zniknie
+    g.fillStyle = "rgba(10,12,14,0.6)";
+    for (const t of n.chwyt.schowek.kafelki) {
+      const p = w.naEkran(n.chwyt.x0 + t.dx, n.chwyt.y0 + t.dy);
+      g.fillRect(p.sx, p.sy, z, z);
+    }
+  }
   for (const { x, y, atom, atomy: wklejane } of pola) {
     const p = w.naEkran(x, y);
-    if (n.rodzaj === "rozbiorka" || n.rodzaj === "kopiuj") {
-      g.fillStyle = n.rodzaj === "kopiuj" ? "rgba(80,140,220,0.3)" : "rgba(192,69,58,0.35)";
+    if (n.rodzaj === "rozbiorka" || n.rodzaj === "kopiuj" || n.rodzaj === "podloga" || (n.rodzaj === "przenies" && !n.chwyt)) {
+      const shift = n.rodzaj === "rozbiorka" && (stan.przeciaganie ? stan.przeciaganie.shift : ostatniaMysz?.shiftKey);
+      g.fillStyle = n.rodzaj === "kopiuj" || n.rodzaj === "przenies" ? "rgba(80,140,220,0.3)"
+        : n.rodzaj === "podloga" ? "rgba(220,150,50,0.35)" : shift ? "rgba(120,20,20,0.6)" : "rgba(192,69,58,0.35)";
       g.fillRect(p.sx, p.sy, z, z);
       continue;
     }
-    if (n.rodzaj === "wklej") {
+    if (n.rodzaj === "wklej" || n.rodzaj === "przenies") {
       const kolejne = [...wklejane].filter((a) => !jestObszarem(a)).sort((a, b) => (+zmienneAtomu(a).layer || 0) - (+zmienneAtomu(b).layer || 0));
       for (const a of kolejne) w.rysujAtom(g, a, x, y, 0.7);
       g.fillStyle = "rgba(80,140,220,0.15)";
@@ -674,6 +748,7 @@ function pokazInspekcje() {
     if (stan.edycjaZm === i) el.append(formularzZmiennych(a, (zm) => {
       stan.edycjaZm = null;
       zmien(atomy.map((x, k) => (k === i ? { typ: a.typ, zm } : x)));
+      zdarzenie("zmienne");
     }));
   });
   el.classList.remove("ukryty");
@@ -763,8 +838,10 @@ function pokazPodpowiedz(e) {
   const n = stan.narzedzie;
   if (!n || !e) { el.classList.add("ukryty"); return; }
   let tekst;
-  if (n.rodzaj === "rozbiorka") tekst = "Rozbiórka – przeciągnij, żeby usunąć obiekty (ściany zostają poszyciem)";
+  if (n.rodzaj === "rozbiorka") tekst = e.shiftKey ? "Rozbiórka + Shift – usuwa wszystko, zostaje sam kosmos" : "Rozbiórka – usuwa obiekty, ściany zostają poszyciem · z Shiftem: wszystko do kosmosu";
   else if (n.rodzaj === "kopiuj") tekst = "Kopiuj – zaznacz prostokąt";
+  else if (n.rodzaj === "przenies") tekst = n.chwyt ? "Przenieś – kliknij w nowe miejsce (PPM anuluje)" : "Przenieś – zaznacz prostokąt do przeniesienia";
+  else if (n.rodzaj === "podloga") tekst = "Usuń podłogę – przeciągnij; podłoga zamienia się w kosmos, obiekty zostają";
   else if (n.rodzaj === "wklej") tekst = `Wklej ${n.schowek.szer}×${n.schowek.wys}${n.nazwa ? " „" + n.nazwa + "”" : ""} – kursor to lewy górny róg`;
   else if (n.rodzaj === "pokoj") tekst = `Pokój – ${ladnaNazwa(stan.ostatnie.sciana)} + ${ladnaNazwa(stan.ostatnie.podloga)} (ostatnio wybrane w Architekcie)`;
   else {
@@ -809,7 +886,7 @@ plotno.addEventListener("mousedown", (e) => {
     return;
   }
   stan.kursor = kaf;
-  stan.przeciaganie = { start: kaf, pola: new Map([[kluczPola(kaf.x, kaf.y), kaf]]) };
+  stan.przeciaganie = { start: kaf, pola: new Map([[kluczPola(kaf.x, kaf.y), kaf]]), shift: e.shiftKey };
   widok.rysuj();
 });
 
@@ -821,6 +898,7 @@ window.addEventListener("mousemove", (e) => {
     widok.kam.x = przesuwanie.kx - dx / widok.kam.zoom;
     widok.kam.y = przesuwanie.ky - dy / widok.kam.zoom;
     widok.rysuj();
+    if (przesuwanie.ruszyl) zdarzenie("kamera");
     return;
   }
   if (!stan.mapa || e.target !== plotno) { if (e.target !== plotno) { $("#podpowiedz").classList.add("ukryty"); } return; }
@@ -865,6 +943,7 @@ plotno.addEventListener("wheel", (e) => {
   const nowy = ZOOMY[i];
   const tx = widok.kam.x + mx / stary, ty = widok.kam.y + my / stary;
   widok.kam.zoom = nowy;
+  zdarzenie("kamera");
   widok.kam.x = tx - mx / nowy;
   widok.kam.y = ty - my / nowy;
   widok.rysuj();
@@ -879,6 +958,7 @@ function petlaRuchu() {
   if (wcisniete.has("a") || wcisniete.has("arrowleft")) widok.kam.x -= v;
   if (wcisniete.has("d") || wcisniete.has("arrowright")) widok.kam.x += v;
   widok.rysuj();
+  zdarzenie("kamera");
   requestAnimationFrame(petlaRuchu);
 }
 
@@ -899,13 +979,16 @@ window.addEventListener("keydown", (e) => {
     e.preventDefault();
     return;
   }
-  if (k === "q" || k === "e") { stan.kierunek = obrot(stan.kierunek, k === "e" ? 1 : -1); pokazPodpowiedz(ostatniaMysz); widok.rysuj(); }
+  if (k === "q" || k === "e") { stan.kierunek = obrot(stan.kierunek, k === "e" ? 1 : -1); zdarzenie("obrot"); pokazPodpowiedz(ostatniaMysz); widok.rysuj(); }
+  else if (k === "shift") { pokazPodpowiedz(ostatniaMysz); widok.rysuj(); }
   else if (k === "escape") { if (stan.narzedzie) anulujNarzedzie(); else { stan.wybrany = null; pokazInspekcje(); widok.rysuj(); } }
   else if (k === "pageup") ustawPoziom(widok.z + 1);
   else if (k === "pagedown") ustawPoziom(widok.z - 1);
   else if (k === "b") przelaczArchitekta();
   else if (k === "x") ustawRozbiorke();
   else if (k === "r") przelaczNarzedzie("pokoj");
+  else if (k === "m") przelaczNarzedzie("przenies");
+  else if (k === "f") przelaczNarzedzie("podloga");
   else if (k === "c") przelaczNarzedzie("kopiuj");
   else if (k === "v") ustawWklej();
   else if (k === "g") { stan.siatka = !stan.siatka; $("#w-siatka").checked = stan.siatka; widok.rysuj(); }
@@ -930,6 +1013,8 @@ const ustawWklej = () => { if (stan.schowek) przelaczNarzedzie("wklej", { schowe
 $("#b-architekt").onclick = przelaczArchitekta;
 $("#b-rozbiorka").onclick = ustawRozbiorke;
 $("#b-pokoj").onclick = () => przelaczNarzedzie("pokoj");
+$("#b-przenies").onclick = () => przelaczNarzedzie("przenies");
+$("#b-podloga").onclick = () => przelaczNarzedzie("podloga");
 $("#b-kopiuj").onclick = () => przelaczNarzedzie("kopiuj");
 $("#b-wklej").onclick = ustawWklej;
 $("#b-zapisz-szablon").onclick = zapiszSzablon;
@@ -983,6 +1068,8 @@ async function start() {
     stan.ostatnie.podloga = najczestszy("podlogi", "/turf/open/floor") || stan.ostatnie.podloga;
     ustawSchowek(null);
     pokazKategorie();
+    initSamouczek($("#samouczek"));
+    $("#b-samouczek").onclick = pokazSamouczek;
     odswiezPrzyciskiNarzedzi();
     ladowanie(null);
     let ostatnia = null;

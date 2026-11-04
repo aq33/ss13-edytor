@@ -31,7 +31,10 @@ Przy pierwszym starcie i po zmianie plików `.dm` czyta kod (ok. 8 s). Wynik trz
 | Obrót | `Q` / `E` |
 | Kable i rury | przeciąganie linii samo łączy segmenty: zakręty, końcówki i doczepianie do istniejących instalacji obok |
 | Pokój | `R`: ściany dookoła, podłoga w środku (ostatnio wybrana ściana i podłoga z Architekta) |
-| Rozbiórka | przycisk albo `X`; usuwa obiekty, ściany zamienia na poszycie |
+| Rozbiórka | przycisk albo `X`; usuwa obiekty, ściany zamienia na poszycie. Z `Shift` usuwa wszystko do kosmosu |
+| Usuń podłogę | `F`: podłoga zamienia się w kosmos, obiekty i ściany zostają |
+| Przenieś | `M`: zaznacz prostokąt, puść, kliknij w nowe miejsce; źródło staje się kosmosem, obszary jadą razem z fragmentem |
+| Samouczek | przycisk na górze; 14 lekcji odhacza się samo, gdy zrobisz daną rzecz |
 | Kopiuj / wklej | `C` zaznacza prostokąt, potem klik wkleja (kursor = lewy górny róg); `V` wraca do wklejania |
 | Szablony | „Zapisz jako szablon” zapisuje schowek do `szablony/`; wklejasz je z kategorii **Szablony** w Architekcie |
 | Inspekcja kafelka | bez narzędzia klik na kafelek: lista atomów z obracaniem, usuwaniem, pipetą (⧉) i edycją zmiennych (✎) |

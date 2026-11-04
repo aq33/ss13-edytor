@@ -27,7 +27,7 @@ button { background: var(--przycisk); color: var(--tekst); border: 1px solid #55
 button:hover { background: var(--przycisk-hover); }
 button.wlaczony { border-color: var(--wybrany); color: #fff; background: #4a4430; }
 button:disabled { opacity: .45; cursor: default; }
-button.duzy { padding: 7px 18px; font-size: 14px; min-width: 120px; }
+button.duzy { padding: 7px 10px; font-size: 13px; }
 input[type=search] { background: #101315; color: var(--tekst); border: 1px solid var(--ramka); padding: 4px 6px; font: inherit; }
 input[type=checkbox] { accent-color: var(--wybrany); vertical-align: -2px; }
 
@@ -87,6 +87,24 @@ select { background: #101315; color: var(--tekst); border: 1px solid var(--ramka
 .projekt { position: relative; }
 .usun-szablon { position: absolute; top: 2px; right: 2px; padding: 0 4px; font-size: 11px; display: none; }
 .projekt:hover .usun-szablon { display: block; }
+
+#samouczek { position: fixed; top: 44px; right: 160px; width: 320px; max-height: calc(100vh - 110px); overflow-y: auto; padding: 8px 10px; transition: box-shadow .3s; }
+#samouczek.mrugnij { box-shadow: 0 0 0 2px var(--dobre), 0 2px 8px rgba(0,0,0,.5); }
+#samouczek .pasek { display: flex; align-items: center; gap: 8px; }
+#samouczek .pasek button { padding: 0 6px; }
+#samouczek .postep { height: 4px; background: #101315; margin: 6px 0 8px; }
+#samouczek .postep div { height: 100%; background: var(--dobre); transition: width .3s; }
+#samouczek .lekcja { background: #1d2328; border-left: 3px solid var(--wybrany); padding: 6px 8px; }
+#samouczek .tytul-lekcji { font-weight: 600; color: var(--wybrany); margin-bottom: 4px; }
+#samouczek p { margin: 0 0 6px; line-height: 1.45; }
+#samouczek .przyciski-lekcji { display: flex; gap: 6px; justify-content: flex-end; }
+#samouczek .spis { margin: 8px 0 0; padding-left: 22px; font-size: 12px; color: var(--przygaszony); }
+#samouczek .spis li { cursor: pointer; padding: 1px 0; }
+#samouczek .spis li:hover { color: var(--tekst); }
+#samouczek .spis li.zrobione { color: var(--dobre); }
+#samouczek .spis li.zrobione::marker { content: "✓  "; }
+#samouczek .spis li.teraz { color: #fff; font-weight: 600; }
+kbd { display: inline-block; min-width: 18px; padding: 0 4px; margin: 0 1px; border: 1px solid #666; border-bottom-width: 2px; border-radius: 3px; background: #2b3137; font: 11px Consolas, monospace; text-align: center; color: #fff; }
 
 #podpowiedz { position: fixed; pointer-events: none; background: rgba(0,0,0,.75); padding: 3px 7px; font-size: 12px; border: 1px solid var(--ramka); white-space: nowrap; }
 
