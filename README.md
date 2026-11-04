@@ -6,6 +6,8 @@ Plik wczytany i zapisany bez zmian jest identyczny z oryginałem.
 
 ## Z linka (bez instalowania)
 
+**https://aq33.github.io/ss13-edytor/**
+
 Otwórz stronę edytora w Chrome albo Edge i kliknij **Wybierz folder repozytorium**. Wskaż główny folder repo, ten z plikiem `.dme`.
 Przeglądarka zapyta o zgodę na dostęp. Edytor czyta kod i ikony prosto z dysku i zapisuje zmiany do plików `.dmm`.
 Nic nie jest wysyłane do internetu. Katalog typów i szablony trzyma przeglądarka (IndexedDB), osobno dla każdego repo.
