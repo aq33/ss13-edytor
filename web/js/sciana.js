@@ -41,6 +41,21 @@ export function atomNaScianie(typ, d) {
   return { typ, zm };
 }
 
+// Po której stronie kafelka wisi obiekt ścienny (do kontroli mapy) albo null.
+export function kierunekObiektuSciennego(atom, v) {
+  // najpierw przesunięcie pikseli (podtypy kierunkowe też je mają w kodzie)
+  const px = +v.pixel_x || 0, py = +v.pixel_y || 0;
+  if (Math.max(Math.abs(px), Math.abs(py)) >= 16) return Math.abs(py) >= Math.abs(px) ? (py > 0 ? 1 : 2) : (px > 0 ? 4 : 8);
+  const KIER = { north: 1, south: 2, east: 4, west: 8 };
+  const m = /\/(?:directional|auto_name)\/(north|south|east|west)$/.exec(atom.typ);
+  if (m) return KIER[m[1]];
+  // gołe …/east u znaków to zwykle kierunek strzałki, nie strona montażu
+  const g = /\/(north|south|east|west)$/.exec(atom.typ);
+  if (g && !jestTypu(atom.typ, "/obj/structure/sign")) return KIER[g[1]];
+  if (jestTypu(atom.typ, "/obj/machinery/light")) return [1, 2, 4, 8].includes(v.dir | 0) ? v.dir | 0 : 2;
+  return null;
+}
+
 function sciana(mapa, x, y, z) {
   if (!mapa.wewnatrz(x, y)) return false;
   return mapa.atomy(x, y, z).some((a) => a.typ.startsWith("/turf/closed") || a.typ.startsWith("/obj/structure/falsewall"));

@@ -44,7 +44,7 @@
     "/obj/machinery/door_buttons", "/obj/machinery/embedded_controller", "/obj/structure/closet/emcloset/wall",
     "/obj/machinery/ai_slipper", "/obj/machinery/barsign", "/obj/item/wallframe"
   ],
-  "naScianieWyklucz": ["/obj/machinery/light/floor", "/obj/machinery/light/small/built/floor", "/obj/machinery/button/floor"],
+  "naScianieWyklucz": ["/obj/machinery/light/floor", "/obj/machinery/light/small/built/floor", "/obj/machinery/light/runway", "/obj/machinery/button/floor"],
 
   "_tryby": "Jak stawia się typ przeciągnięciem: obrys = pusty prostokąt (ściany), prostokat = wypełnienie (podłogi, obszary), linia = linia w kształcie L (kable, rury, okna), pojedynczo = jeden obiekt na kafelek pod kursorem (meble).",
   "tryby": [

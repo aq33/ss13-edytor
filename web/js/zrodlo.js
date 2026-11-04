@@ -52,7 +52,8 @@ class ZrodloLokalne {
   }
 
   async typy(postep) {
-    const kluczPamieci = "typy:" + this.nazwa;
+    // v2: doszły zmienne obszarów (requires_power) – stary katalog trzeba przeliczyć
+    const kluczPamieci = "typy:v2:" + this.nazwa;
     // Pamięć podręczna ważna, dopóki nie zmienił się żaden wczytany plik .dm.
     const zapisane = await idbPobierz(kluczPamieci);
     if (zapisane) {

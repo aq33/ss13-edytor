@@ -74,6 +74,18 @@ Przy pierwszym starcie i po zmianie plików `.dm` czyta kod (ok. 8 s). Wynik trz
 - `web/js/`: `dmi.js` (ikony), `dmm.js` (odczyt i zapis map), `typy.js` (dziedziczenie zmiennych),
   `render.js` (rysowanie), `edycja.js` (operacje i historia), `main.js` (interfejs).
 
+## Kontrola mapy (raport inżyniera)
+
+Przycisk **Kontrola** na górnym pasku pokazuje na bieżąco liczbę problemów. Panel grupuje je z poradą, kliknięcie pozycji przenosi do kafelka, a na mapie pojawiają się znaczniki w kolorze wagi.
+
+| Waga | Sprawdzenie |
+|---|---|
+| ⛔ błąd | typ nie istnieje w kodzie (mapa się nie skompiluje), kafelek bez turfa albo bez obszaru, drzwi, okno albo mebel w ścianie, obszar wymagający zasilania bez APC, kilka APC w obszarze |
+| ⚠ ostrzeżenie | kilka turfów na kafelku, zdublowana konstrukcja albo instalacja, urwany kabel, APC bez kabla pod spodem, obiekt ścienny bez ściany po swojej stronie, kabel, rura albo okno w próżni bez kratownicy |
+| ℹ uwaga | obszar bez alarmu powietrza, obszar bez światła |
+
+To, czy obszar potrzebuje zasilania, edytor bierze z kodu (`requires_power`, `always_unpowered`). Sprawdzenia są w `web/js/kontrola.js` i są skalibrowane na mapach Aquili, żeby nie zgłaszały naszego celowego stylu (automaty w ścianach, poszycie kadłuba na zewnątrz).
+
 ## Wygładzanie
 
 `web/js/wygladzanie.js` liczy połączenia tak jak gra:

@@ -7,6 +7,7 @@ import { autolacz, laczySie } from "./polaczenia.js";
 import { initSamouczek, zdarzenie, pokazSamouczek } from "./samouczek.js";
 import { zrodlo, ustawZrodlo, ZrodloFolder, ZrodloPliki, ZrodloSerwer, ZrodloGithub } from "./zrodlo.js";
 import { ustawRegulySciany, jestScienny, przyciagnij, atomNaScianie } from "./sciana.js";
+import { sprawdzMape, SPRAWDZENIA, wagaProblemu } from "./kontrola.js";
 import { initOperacje, initSzukanie, nowaMapa, zmienRozmiar, dodajPoziom, usunPoziom, szukaj, przelaczSzukanie, wynikiSzukania, eksportPng } from "./operacje.js";
 
 const $ = (s) => document.querySelector(s);
@@ -328,8 +329,9 @@ function pokazKarte(k, nowa) {
   pokazPoziomy();
   pokazInspekcje();
   pokazKarty();
-  // wyniki szukania i zaznaczenie dotyczą konkretnej mapy
+  // wyniki szukania, zaznaczenie i kontrola dotyczą konkretnej mapy
   stan.zaznaczenie = null;
+  zaplanujKontrole();
   if (!$("#szukaj-panel").classList.contains("ukryty")) szukaj();
   widok.rysuj();
 }
@@ -478,6 +480,7 @@ function ustawZmiany(v) {
   if (k) k.zmiany = v;
   $("#b-zapisz").classList.toggle("zmiany", v);
   if (bylo !== v) pokazKarty();
+  if (v) zaplanujKontrole();
 }
 
 // Po zapisie w trybie GitHub: plik się pobrał, teraz trzeba go wgrać (GitHub sam zrobi fork i PR).
@@ -877,6 +880,14 @@ function pokazInspekcje() {
   if (!m || !w) { el.classList.add("ukryty"); return; }
   const atomy = m.atomy(w.x, w.y, widok.z);
   el.innerHTML = `<div class="naglowek" style="margin-bottom:6px">Kafelek (${w.x}, ${w.y}, ${widok.z})</div>`;
+  for (const p of kontrola.naKafelku.get(widok.z + ":" + w.x + ":" + w.y) || []) {
+    const d = document.createElement("div");
+    const def = SPRAWDZENIA[p.kod];
+    d.className = "problem-kafelka waga-" + def.waga;
+    d.textContent = `${IKONA_WAGI[def.waga]} ${def.tytul}${p.typ ? ": " + ladnaNazwa(p.typ) : ""}`;
+    d.title = def.porada;
+    el.append(d);
+  }
   atomy.forEach((a, i) => {
     const r = document.createElement("div");
     r.className = "wiersz";
@@ -1030,6 +1041,8 @@ let przesuwanie = null;
 let ostatniaMysz = null;
 
 plotno.addEventListener("contextmenu", (e) => e.preventDefault());
+// Bez tego Chrome po wciśnięciu kółka włącza autoprzewijanie strony.
+plotno.addEventListener("auxclick", (e) => e.preventDefault());
 
 plotno.addEventListener("mousedown", (e) => {
   if (!stan.mapa) return;
@@ -1101,14 +1114,29 @@ window.addEventListener("mouseup", (e) => {
 
 plotno.addEventListener("mouseleave", () => { $("#info").classList.add("ukryty"); });
 
+let sumaKolka = 0;
 plotno.addEventListener("wheel", (e) => {
   e.preventDefault();
+  // Wciśnięte kółko / przeciąganie: żadnego przybliżania (myszy wysyłają wtedy przechył kółka).
+  if (przesuwanie || e.buttons) return;
+  // Przechył kółka (albo przesunięcie na touchpadzie w bok) przesuwa widok, nie przybliża.
+  if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+    widok.kam.x += e.deltaX / widok.kam.zoom;
+    widok.rysuj();
+    return;
+  }
+  if (!e.deltaY) return;
+  // Touchpady wysyłają dziesiątki małych kroków – zbieram je do jednego „ząbka”.
+  sumaKolka += e.deltaMode === 0 ? e.deltaY : e.deltaY * 40;
+  if (Math.abs(sumaKolka) < 40) return;
+  const wGore = sumaKolka < 0;
+  sumaKolka = 0;
   const r = plotno.getBoundingClientRect();
   const mx = e.clientX - r.left, my = e.clientY - r.top;
   const stary = widok.kam.zoom;
   let i = ZOOMY.indexOf(stary);
   if (i < 0) i = ZOOMY.findIndex((z) => z >= stary);
-  i = Math.max(0, Math.min(ZOOMY.length - 1, i + (e.deltaY < 0 ? 1 : -1)));
+  i = Math.max(0, Math.min(ZOOMY.length - 1, i + (wGore ? 1 : -1)));
   const nowy = ZOOMY[i];
   const tx = widok.kam.x + mx / stary, ty = widok.kam.y + my / stary;
   widok.kam.zoom = nowy;
@@ -1183,6 +1211,123 @@ function przelaczNarzedzie(rodzaj, dodatki = {}) {
 }
 const ustawRozbiorke = () => przelaczNarzedzie("rozbiorka");
 const ustawWklej = () => { if (stan.schowek) przelaczNarzedzie("wklej", { schowek: stan.schowek }); };
+
+// ---------------------------------------------------------------- kontrola mapy (raport inżyniera)
+
+const kontrola = { wyniki: [], rozwiniete: new Set(), znaczniki: true, czas: null, naKafelku: new Map() };
+const IKONA_WAGI = { blad: "⛔", ostrzezenie: "⚠", uwaga: "ℹ" };
+const NAZWA_WAGI = { blad: ["błąd", "błędy", "błędów"], ostrzezenie: ["ostrzeżenie", "ostrzeżenia", "ostrzeżeń"], uwaga: ["uwaga", "uwagi", "uwag"] };
+const odmiana = (n, [a, b, c]) => (n === 1 ? a : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? b : c);
+
+function zaplanujKontrole() {
+  clearTimeout(kontrola.czas);
+  kontrola.czas = setTimeout(uruchomKontrole, 350);
+}
+
+function uruchomKontrole() {
+  kontrola.wyniki = stan.mapa ? sprawdzMape(stan.mapa) : [];
+  kontrola.naKafelku = new Map();
+  for (const p of kontrola.wyniki) {
+    const k = p.z + ":" + p.x + ":" + p.y;
+    if (!kontrola.naKafelku.has(k)) kontrola.naKafelku.set(k, []);
+    kontrola.naKafelku.get(k).push(p);
+  }
+  pokazKontrole();
+  if (stan.wybrany) pokazInspekcje();
+  widok.rysuj();
+}
+
+function liczWagi() {
+  const n = { blad: 0, ostrzezenie: 0, uwaga: 0 };
+  for (const p of kontrola.wyniki) n[wagaProblemu(p)]++;
+  return n;
+}
+
+function pokazKontrole() {
+  const n = liczWagi();
+  const b = $("#b-kontrola");
+  b.className = n.blad ? "kontrola-blad" : n.ostrzezenie ? "kontrola-ostrzezenie" : "kontrola-ok";
+  b.innerHTML = !stan.mapa ? "Kontrola" : n.blad + n.ostrzezenie + n.uwaga === 0 ? "✓ Kontrola" : `${n.blad ? "⛔ " + n.blad + " " : ""}${n.ostrzezenie ? "⚠ " + n.ostrzezenie + " " : ""}${n.uwaga ? "ℹ " + n.uwaga : ""}`;
+  b.title = "Kontrola mapy: " + Object.entries(n).map(([w, ile]) => `${ile} ${odmiana(ile, NAZWA_WAGI[w])}`).join(", ");
+  const el = $("#kontrola");
+  if (el.classList.contains("ukryty")) return;
+  el.innerHTML = "";
+  const g = document.createElement("div");
+  g.className = "pasek";
+  g.innerHTML = `<span class="naglowek">Kontrola mapy</span><span style="flex:1"></span><label class="przygaszone"><input type="checkbox" ${kontrola.znaczniki ? "checked" : ""}> znaczniki</label><button title="Zamknij">✕</button>`;
+  g.querySelector("input").onchange = (e) => { kontrola.znaczniki = e.target.checked; widok.rysuj(); };
+  g.querySelector("button").onclick = () => { el.classList.add("ukryty"); document.body.classList.remove("z-kontrola"); widok.rysuj(); };
+  el.append(g);
+  const podsumowanie = document.createElement("div");
+  podsumowanie.className = "podsumowanie";
+  podsumowanie.innerHTML = Object.entries(n).map(([w, ile]) => `<span class="waga-${w}">${IKONA_WAGI[w]} ${ile} ${odmiana(ile, NAZWA_WAGI[w])}</span>`).join("");
+  el.append(podsumowanie);
+  if (!kontrola.wyniki.length) {
+    el.insertAdjacentHTML("beforeend", `<div class="wszystko-ok">✓ Nie znalazłem problemów na tej mapie.</div>`);
+    return;
+  }
+  const grupy = new Map();
+  for (const p of kontrola.wyniki) { if (!grupy.has(p.kod)) grupy.set(p.kod, []); grupy.get(p.kod).push(p); }
+  for (const [kod, lista] of grupy) {
+    const def = SPRAWDZENIA[kod];
+    const sekcja = document.createElement("div");
+    sekcja.className = "grupa waga-" + def.waga;
+    const nag = document.createElement("div");
+    nag.className = "grupa-naglowek";
+    const otwarta = kontrola.rozwiniete.has(kod);
+    nag.innerHTML = `<span>${otwarta ? "▾" : "▸"} ${IKONA_WAGI[def.waga]}</span><span class="grupa-tytul"></span><span class="ile">${lista.length}</span>`;
+    nag.querySelector(".grupa-tytul").textContent = def.tytul;
+    nag.onclick = () => { if (otwarta) kontrola.rozwiniete.delete(kod); else kontrola.rozwiniete.add(kod); pokazKontrole(); };
+    sekcja.append(nag);
+    if (otwarta) {
+      const porada = document.createElement("div");
+      porada.className = "porada";
+      porada.textContent = def.porada;
+      sekcja.append(porada);
+      for (const p of lista.slice(0, 150)) {
+        const w = document.createElement("div");
+        w.className = "wynik";
+        w.textContent = `(${p.x}, ${p.y}, ${p.z})  ${p.typ ? ladnaNazwa(p.typ) : ""}`;
+        w.title = p.typ || "";
+        w.onclick = () => pokazKafelek(p.x, p.y, p.z);
+        sekcja.append(w);
+      }
+      if (lista.length > 150) sekcja.insertAdjacentHTML("beforeend", `<div class="przygaszone">…i ${lista.length - 150} więcej</div>`);
+    }
+    el.append(sekcja);
+  }
+}
+
+function przelaczKontrole() {
+  const el = $("#kontrola");
+  el.classList.toggle("ukryty");
+  document.body.classList.toggle("z-kontrola", !el.classList.contains("ukryty"));
+  if (!el.classList.contains("ukryty")) zdarzenie("kontrola");
+  pokazKontrole();
+  widok.rysuj();
+}
+$("#b-kontrola").onclick = przelaczKontrole;
+
+const KOLOR_WAGI = { blad: "#e0483c", ostrzezenie: "#e6b422", uwaga: "#5a9be0" };
+widok.nakladki.push((g, w) => {
+  if (!kontrola.znaczniki || !kontrola.wyniki.length || $("#kontrola").classList.contains("ukryty")) return;
+  const z = w.kam.zoom;
+  const r = Math.max(4, z * 0.28);
+  for (const [k, lista] of kontrola.naKafelku) {
+    const [pz, px, py] = k.split(":").map(Number);
+    if (pz !== w.z) continue;
+    const waga = lista.reduce((m, p) => (wagaProblemu(p) === "blad" || m === "blad" ? "blad" : wagaProblemu(p) === "ostrzezenie" || m === "ostrzezenie" ? "ostrzezenie" : "uwaga"), "uwaga");
+    const p = w.naEkran(px, py);
+    g.fillStyle = KOLOR_WAGI[waga];
+    g.beginPath();
+    g.moveTo(p.sx + z - r, p.sy);
+    g.lineTo(p.sx + z, p.sy);
+    g.lineTo(p.sx + z, p.sy + r);
+    g.closePath();
+    g.fill();
+    if (z >= 12) { g.strokeStyle = KOLOR_WAGI[waga]; g.lineWidth = 1; g.strokeRect(p.sx + 0.5, p.sy + 0.5, z - 1, z - 1); }
+  }
+});
 
 // Przeskok do kafelka (np. z wyników szukania): poziom, kamera, inspekcja.
 function pokazKafelek(x, y, z) {

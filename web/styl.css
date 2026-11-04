@@ -133,6 +133,30 @@ select { background: #101315; color: var(--tekst); border: 1px solid var(--ramka
 #samouczek .spis li.teraz { color: #fff; font-weight: 600; }
 kbd { display: inline-block; min-width: 18px; padding: 0 4px; margin: 0 1px; border: 1px solid #666; border-bottom-width: 2px; border-radius: 3px; background: #2b3137; font: 11px Consolas, monospace; text-align: center; color: #fff; }
 
+/* Kontrola mapy – raport inżyniera */
+#b-kontrola.kontrola-ok { color: #8fd18f; }
+#b-kontrola.kontrola-ostrzezenie { color: #f0c94a; border-color: #8a7428; }
+#b-kontrola.kontrola-blad { color: #ff8a80; border-color: #8a3a32; background: #3a2220; }
+#kontrola { position: fixed; right: 10px; bottom: 54px; width: 360px; max-height: calc(100vh - 340px); min-height: 120px; overflow-y: auto; padding: 8px 10px; z-index: 3; }
+body.z-kontrola #info { right: 380px; }
+#kontrola .pasek { display: flex; align-items: center; gap: 8px; }
+#kontrola .pasek button { padding: 0 6px; }
+#kontrola .podsumowanie { display: flex; gap: 12px; margin: 6px 0 8px; font-size: 12px; }
+.waga-blad { --kolor: #ff8a80; }
+.waga-ostrzezenie { --kolor: #f0c94a; }
+.waga-uwaga { --kolor: #7fb3ef; }
+#kontrola .podsumowanie span { color: var(--kolor); }
+#kontrola .wszystko-ok { color: #8fd18f; padding: 10px 0; }
+#kontrola .grupa { border-left: 3px solid var(--kolor); background: #161b1f; margin-bottom: 4px; }
+#kontrola .grupa-naglowek { display: flex; gap: 6px; padding: 4px 6px; cursor: pointer; align-items: center; }
+#kontrola .grupa-naglowek:hover { background: var(--przycisk-hover); }
+#kontrola .grupa-tytul { flex: 1; }
+#kontrola .ile { color: var(--kolor); font-weight: 600; }
+#kontrola .porada { font-size: 12px; color: var(--przygaszony); padding: 2px 8px 6px 22px; line-height: 1.4; }
+#kontrola .wynik { font: 12px Consolas, monospace; padding: 1px 8px 1px 22px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#kontrola .wynik:hover { background: var(--przycisk-hover); }
+#inspekcja .problem-kafelka { color: var(--kolor); font-size: 12px; padding: 2px 4px; margin-bottom: 4px; border-left: 3px solid var(--kolor); background: #161b1f; cursor: help; }
+
 #podpowiedz { position: fixed; pointer-events: none; background: rgba(0,0,0,.75); padding: 3px 7px; font-size: 12px; border: 1px solid var(--ramka); white-space: nowrap; }
 
 .okno { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: flex; align-items: center; justify-content: center; z-index: 10; }
