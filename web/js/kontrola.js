@@ -5,6 +5,7 @@
 import { istnieje, zmienneAtomu, jestTypu } from "./typy.js";
 import { atomNaTekst } from "./dmm.js";
 import { jestScienny, kierunekObiektuSciennego } from "./sciana.js";
+import { kabelSam } from "./wygladzanie.js";
 
 export const SPRAWDZENIA = {
   "nieznany-typ": { waga: "blad", tytul: "Typ nie istnieje w kodzie", porada: "Mapa się nie skompiluje. Ten typ został usunięty albo przemianowany – zamień go (Szukaj i zamień)." },
@@ -56,7 +57,10 @@ function analizuj(atomy) {
     else if (jestTypu(t, "/obj/machinery/airalarm")) a.alarm = true;
     else if (jestTypu(t, "/obj/machinery/light")) a.swiatlo = true; // także podłogowe
     const v = zmienneAtomu(atom);
-    if (jestTypu(t, "/obj/structure/cable")) {
+    if (kabelSam(t)) {
+      // nowe kable: łączą się same, węzeł dla APC robi każdy kabel na kafelku
+      a.wezelKabla = true;
+    } else if (jestTypu(t, "/obj/structure/cable")) {
       const m = /^(\d+)-(\d+)$/.exec(v.icon_state || "");
       if (m) {
         for (const d of [+m[1], +m[2]]) if (d in KROK) a.kable.push(d);

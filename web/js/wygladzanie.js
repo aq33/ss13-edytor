@@ -173,9 +173,37 @@ function tg(mapa, x, y, z, atom, v) {
   return { bazowy: v.icon_state, nakladki: rogiTg(adj) };
 }
 
+// ---------------------------------------------------------------- kable „inteligentne” (nowe tg)
+
+// Nowe kable nie mają icon_state na mapie – w grze łączą się same z sąsiadami tego samego koloru
+// (code/modules/power/cable.dm: reform_connections + update_icon_state). Stary system: stan „a-b”.
+export function kabelSam(typ) {
+  return jestTypu(typ, "/obj/structure/cable") && !/^\d+-\d+$/.test(zmienne(typ).icon_state || "");
+}
+
+function stanKabla(mapa, x, y, z, v) {
+  const kolor = v.cable_color || "red";
+  const omni = !!+v.omni;
+  const kier = [];
+  for (const d of [1, 2, 4, 8]) {
+    const obok = atomyObok(mapa, x, y, z, d);
+    if (!obok) continue;
+    const jest = obok.some((a) => {
+      if (!kabelSam(a.typ)) return false;
+      const va = zmienneAtomu(a);
+      return omni || !!+va.omni || (va.cable_color || "red") === kolor;
+    });
+    if (jest) kier.push(d);
+  }
+  const czesci = kier.length <= 1 ? ["0", ...kier.map(String)] : kier.map(String);
+  if (omni) czesci.push("o");
+  return czesci.join("-");
+}
+
 // ---------------------------------------------------------------- wejście
 
 export function wygladz(mapa, x, y, z, atom, v) {
+  if (kabelSam(atom.typ)) return { bazowy: stanKabla(mapa, x, y, z, v), nakladki: [] };
   const flaga = +v.smooth || 0;
   if (!(flaga & (SMOOTH_TRUE | SMOOTH_MORE))) return null;
   const r = korzen(atom.typ);

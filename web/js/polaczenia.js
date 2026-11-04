@@ -3,6 +3,7 @@
 // prosta pionowa dir 2, pozioma dir 4, zakręt = suma dwóch kierunków (5, 6, 9, 10).
 
 import { zmienne, zmienneAtomu, jestTypu } from "./typy.js";
+import { kabelSam } from "./wygladzanie.js";
 
 const KROK = { 1: [0, 1], 2: [0, -1], 4: [1, 0], 8: [-1, 0] };
 const PRZECIWNY = { 1: 2, 2: 1, 4: 8, 8: 4 };
@@ -78,6 +79,8 @@ function atomZPolaczen(typ, kier, domyslnyKierunek) {
 
 // pola: uporządkowana ścieżka linii. Zwraca atomy do postawienia na kolejnych polach.
 export function autolacz(mapa, z, pola, typ, kierunekGracza) {
+  // nowe kable łączą się w grze same – wystarczy położyć je na kafelkach
+  if (kabelSam(typ)) return pola.map(() => ({ typ, zm: [] }));
   return pola.map((p, i) => {
     const kier = new Set();
     if (i > 0) kier.add(kierunekZPola(p, pola[i - 1]));

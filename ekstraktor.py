@@ -25,6 +25,7 @@ ZMIENNE = {
     "abstract_type", "parent_type", "base_icon_state", "smoothing_flags",
     "smoothing_groups", "legacy_smooth", "fulltile", "anchored",
     "texture", "texture_state", "requires_power", "always_unpowered",
+    "cable_color", "omni", "multiz",
 }
 
 KORZENIE = ("/area", "/turf", "/obj", "/mob")
