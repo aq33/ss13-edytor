@@ -72,8 +72,26 @@
 
 <div id="okno-map" class="okno ukryty">
   <div class="panel okno-tresc">
-    <div class="pasek"><span class="naglowek">Otwórz mapę</span><input id="szukaj-mapy" type="search" placeholder="Filtruj…" autocomplete="off"><button id="zamknij-mapy">✕</button></div>
+    <div class="pasek"><span class="naglowek">Otwórz mapę</span><input id="szukaj-mapy" type="search" placeholder="Filtruj…" autocomplete="off"><button id="b-zmien-repo" title="Wybierz inny folder repozytorium">Zmień repo</button><button id="zamknij-mapy">✕</button></div>
     <div id="lista-map"></div>
+  </div>
+</div>
+
+<div id="start" class="okno ukryty">
+  <div class="panel okno-tresc start-tresc">
+    <div class="start-tytul">Edytor map SS13</div>
+    <p>Budowanie map jak w RimWorldzie: ikonki zamiast ścieżek, przeciąganie ścian i podłóg, kable, które łączą się same.</p>
+    <p>Wskaż <b>główny folder repozytorium</b> serwera, czyli ten z plikiem <code>.dme</code> (np. <code>AquilaStation</code> albo <code>NSV13-master</code>). Edytor przeczyta kod i ikony prosto z dysku, a zmiany zapisze do plików <code>.dmm</code>.</p>
+    <div id="start-blad" class="start-blad ukryty"></div>
+    <div class="start-przyciski">
+      <button id="start-folder" class="duzy wlaczony">Wybierz folder repozytorium</button>
+      <button id="start-ponownie" class="duzy ukryty"></button>
+    </div>
+    <div id="start-bez-zapisu" class="ukryty">
+      <p class="przygaszone">Ta przeglądarka nie pozwala stronom zapisywać plików. Folder da się wczytać, a zapisana mapa pobierze się jako plik do podmiany w repo. Pełny zapis działa w Chrome i Edge.</p>
+      <label class="duzy-plik">Wczytaj folder repozytorium<input id="start-pliki" type="file" webkitdirectory multiple></label>
+    </div>
+    <p class="przygaszone male">Nic nie jest wysyłane do internetu, wszystko dzieje się w Twojej przeglądarce. Przeglądarka zapyta o zgodę na dostęp do folderu. Pierwsze wczytanie kodu trwa kilka sekund, kolejne są szybsze. Przed commitem obejrzyj diff w gicie.</p>
   </div>
 </div>
 

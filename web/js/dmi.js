@@ -1,5 +1,7 @@
 // Wczytywanie ikon .dmi: to zwykłe PNG z opisem stanów w bloku zTXt/tEXt "Description".
 
+import { zrodlo } from "./zrodlo.js";
+
 const ikony = new Map();        // ścieżka -> Promise<Ikona|null>
 const gotowe = new Map();       // ścieżka -> Ikona|null (po wczytaniu)
 const sluchacze = new Set();
@@ -64,9 +66,8 @@ function parsujOpis(tekst) {
 
 async function wczytaj(sciezka) {
   try {
-    const odp = await fetch("/repo/" + encodeURI(sciezka));
-    if (!odp.ok) return null;
-    const bufor = await odp.arrayBuffer();
+    const bufor = await zrodlo.bajty(sciezka);
+    if (!bufor) return null;
     const opis = await opisPng(bufor);
     const obraz = await createImageBitmap(new Blob([bufor], { type: "image/png" }));
     const meta = opis ? parsujOpis(opis) : { szer: obraz.width, wys: obraz.height, stany: new Map([["", { nazwa: "", kierunki: 1, klatki: 1, indeks: 0 }]]) };

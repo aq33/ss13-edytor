@@ -118,5 +118,16 @@ kbd { display: inline-block; min-width: 18px; padding: 0 4px; margin: 0 1px; bor
 #lista-map div:hover { background: var(--przycisk-hover); }
 #lista-map small { color: var(--przygaszony); }
 
+.start-tresc { width: min(560px, 94vw); padding: 22px 24px; line-height: 1.5; }
+.start-tytul { font-size: 22px; font-weight: 700; color: var(--wybrany); margin-bottom: 8px; }
+.start-tresc p { margin: 0 0 10px; }
+.start-tresc code { background: #101315; padding: 0 4px; border: 1px solid var(--ramka); }
+.start-przyciski { display: flex; flex-direction: column; gap: 8px; margin: 14px 0; }
+.start-przyciski button { padding: 10px; font-size: 15px; }
+.start-blad { border: 1px solid var(--zle); background: #2a1715; padding: 6px 10px; margin: 8px 0; }
+.duzy-plik { display: block; text-align: center; padding: 10px; border: 1px solid var(--wybrany); background: #4a4430; cursor: pointer; margin: 8px 0; }
+.duzy-plik input { display: none; }
+.male { font-size: 12px; }
+
 #komunikat { pointer-events: none; position: fixed; top: 46px; left: 50%; transform: translateX(-50%); background: var(--panel); border: 1px solid var(--wybrany); padding: 6px 14px; z-index: 20; }
 #komunikat.blad { border-color: var(--zle); }

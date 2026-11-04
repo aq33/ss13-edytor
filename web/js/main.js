@@ -5,6 +5,7 @@ import { Widok, ikonkaTypu, kolorObszaru } from "./render.js";
 import { nowyAtom, poPostawieniu, mozna, poRozbiorce, bezAtomu, obrocony, obrot, Historia } from "./edycja.js";
 import { autolacz, laczySie } from "./polaczenia.js";
 import { initSamouczek, zdarzenie, pokazSamouczek } from "./samouczek.js";
+import { zrodlo, ustawZrodlo, ZrodloFolder, ZrodloPliki, ZrodloSerwer } from "./zrodlo.js";
 
 const $ = (s) => document.querySelector(s);
 const plotno = $("#plotno");
@@ -126,7 +127,7 @@ function podgrupaTypu(typ, kat) {
 // ---------------------------------------------------------------- szablony
 
 async function wczytajSzablony() {
-  try { stan.szablony = await fetch("/api/szablony").then((r) => r.json()); } catch { stan.szablony = []; }
+  try { stan.szablony = await zrodlo.szablony(); } catch { stan.szablony = []; }
 }
 
 // Miniatura fragmentu mapy (szablonu) na canvasie.
@@ -174,7 +175,7 @@ function pokazSzablony() {
     x.onclick = async (e) => {
       e.stopPropagation();
       if (!confirm(`Usunąć szablon „${s.nazwa}”?`)) return;
-      await fetch("/api/szablon?plik=" + encodeURIComponent(s.plik), { method: "DELETE" });
+      await zrodlo.usunSzablon(s.plik);
       await wczytajSzablony();
       pokazSzablony();
     };
@@ -196,8 +197,9 @@ async function zapiszSzablon() {
   const nazwa = prompt("Nazwa szablonu:", "Pokój");
   if (!nazwa) return;
   const plik = nazwa.trim().replace(/[^\w\-ąćęłńóśźżĄĆĘŁŃÓŚŹŻ ]/g, "_").slice(0, 80) + ".json";
-  const odp = await fetch("/api/szablon?plik=" + encodeURIComponent(plik), { method: "POST", body: JSON.stringify({ nazwa: nazwa.trim(), szer: s.szer, wys: s.wys, kafelki: s.kafelki }) });
-  if (!odp.ok) { komunikat("Nie zapisano szablonu: " + ((await odp.json().catch(() => ({}))).blad || odp.status), true); return; }
+  try {
+    await zrodlo.zapiszSzablon(plik, { nazwa: nazwa.trim(), szer: s.szer, wys: s.wys, kafelki: s.kafelki });
+  } catch (e) { komunikat("Nie zapisano szablonu: " + e.message, true); return; }
   await wczytajSzablony();
   komunikat(`Zapisano szablon „${nazwa}”`);
   if (stan.kategoria === "szablony") pokazSzablony();
@@ -296,9 +298,9 @@ async function otworzMape(plik) {
   if (stan.zmiany && !confirm("Masz niezapisane zmiany. Otworzyć inną mapę?")) return;
   ladowanie("Wczytuję " + plik + "…");
   try {
-    const odp = await fetch("/repo/" + encodeURI(plik));
-    if (!odp.ok) throw new Error("serwer zwrócił " + odp.status);
-    const mapa = Mapa.parsuj(await odp.text(), plik);
+    const tekst = await zrodlo.tekst(plik);
+    if (tekst === null) throw new Error("nie ma pliku " + plik);
+    const mapa = Mapa.parsuj(tekst, plik);
     // Najpierw wczytuję wszystkie ikony z mapy, żeby obraz nie „doskakiwał”.
     const pliki = new Set();
     for (const p of mapa.prefaby) for (const a of p.atomy) { const i = zmienneAtomu(a).icon; if (i) pliki.add(i); }
@@ -311,8 +313,8 @@ async function otworzMape(plik) {
     widok.ustawMape(mapa);
     wysrodkuj();
     pokazPoziomy();
-    $("#nazwa-mapy").textContent = `${plik} — ${mapa.szer}×${mapa.wys}, poziomów: ${mapa.poziomy}`;
-    try { localStorage.setItem("ostatnia-mapa", plik); } catch {}
+    $("#nazwa-mapy").textContent = `${zrodlo.nazwa}: ${plik} — ${mapa.szer}×${mapa.wys}, poziomów: ${mapa.poziomy}`;
+    try { localStorage.setItem("ostatnia-mapa:" + zrodlo.nazwa, plik); } catch {}
     pokazInspekcje();
   } catch (e) {
     komunikat("Nie udało się wczytać mapy: " + e.message, true);
@@ -373,11 +375,10 @@ async function zapisz() {
   ladowanie("Zapisuję…");
   try {
     const tekst = stan.mapa.zapisz();
-    const odp = await fetch("/api/zapisz?plik=" + encodeURIComponent(stan.mapa.plik), { method: "POST", body: tekst });
-    const w = await odp.json();
-    if (!odp.ok) throw new Error(w.blad || odp.status);
+    const jak = await zrodlo.zapisz(stan.mapa.plik, tekst);
     ustawZmiany(false);
-    komunikat("Zapisano " + stan.mapa.plik);
+    if (jak === "pobrano") komunikat(`Pobrano ${stan.mapa.plik.split("/").pop()} – podmień nim plik ${stan.mapa.plik} w repo (ta przeglądarka nie zapisuje prosto na dysk).`);
+    else komunikat("Zapisano " + stan.mapa.plik);
     zdarzenie("zapisz");
   } catch (e) {
     komunikat("Zapis nie powiódł się: " + e.message, true);
@@ -1046,18 +1047,46 @@ function pokazListeMap() {
 $("#b-otworz").onclick = () => { $("#okno-map").classList.remove("ukryty"); $("#szukaj-mapy").focus(); pokazListeMap(); };
 $("#zamknij-mapy").onclick = () => $("#okno-map").classList.add("ukryty");
 $("#szukaj-mapy").oninput = pokazListeMap;
+$("#b-zmien-repo").onclick = () => {
+  if (stan.zmiany && !confirm("Masz niezapisane zmiany. Zmienić repozytorium?")) return;
+  stan.zmiany = false;
+  location.reload();
+};
 
 // ---------------------------------------------------------------- start
 
-async function start() {
-  ladowanie("Wczytuję typy z kodu…");
+// Ekran startowy: wybór folderu repozytorium (wersja z linka) albo serwer.py (lokalnie).
+async function pokazStart(blad) {
+  const el = $("#start");
+  el.classList.remove("ukryty");
+  $("#start-blad").textContent = blad || "";
+  $("#start-blad").classList.toggle("ukryty", !blad);
+  const mozeFolder = ZrodloFolder.dostepne();
+  $("#start-folder").classList.toggle("ukryty", !mozeFolder);
+  $("#start-bez-zapisu").classList.toggle("ukryty", mozeFolder);
+  const ostatni = mozeFolder ? await ZrodloFolder.ostatni() : null;
+  $("#start-ponownie").classList.toggle("ukryty", !ostatni);
+  if (ostatni) {
+    $("#start-ponownie").textContent = `Otwórz ponownie: ${ostatni.name}`;
+    $("#start-ponownie").onclick = async () => { const z = await ZrodloFolder.otworzPonownie(ostatni); if (z) uruchom(z); };
+  }
+  $("#start-folder").onclick = async () => {
+    try { const z = await ZrodloFolder.wybierz(); if (z) uruchom(z); } catch (e) { pokazStart("Nie udało się otworzyć folderu: " + e.message); }
+  };
+  $("#start-pliki").onchange = (e) => { if (e.target.files.length) uruchom(new ZrodloPliki([...e.target.files])); };
+}
+
+async function uruchom(z) {
+  $("#start").classList.add("ukryty");
+  ustawZrodlo(z);
+  ladowanie("Czytam kod z " + z.nazwa + "…");
   try {
-    const [info, kat] = await Promise.all([
-      fetch("/api/info").then((r) => r.json()),
+    const [kat, mapy] = await Promise.all([
       fetch("kategorie.json").then((r) => r.json()),
-      wczytajTypy(),
+      z.mapy(),
+      wczytajTypy((t) => ladowanie(t)),
     ]);
-    listaMap = info.mapy;
+    listaMap = mapy;
     stan.kategorie = [...kat.kategorie, { id: "szablony", nazwa: "Szablony", ikona: "/obj/item/paper", reguly: [] }];
     stan.tryby = kat.tryby;
     zbudujKatalog();
@@ -1072,18 +1101,28 @@ async function start() {
     $("#b-samouczek").onclick = pokazSamouczek;
     odswiezPrzyciskiNarzedzi();
     ladowanie(null);
+    $("#b-zmien-repo").classList.toggle("ukryty", z.rodzaj === "serwer");
     let ostatnia = null;
-    try { ostatnia = localStorage.getItem("ostatnia-mapa"); } catch {}
+    try { ostatnia = localStorage.getItem("ostatnia-mapa:" + z.nazwa); } catch {}
     const dom = listaMap.find((m) => m.plik === ostatnia) || listaMap.find((m) => /Atlas\/atlas\.dmm$/i.test(m.plik));
     if (dom) await otworzMape(dom.plik);
     else $("#b-otworz").click();
   } catch (e) {
     ladowanie(null);
-    komunikat("Błąd startu: " + e.message, true);
     console.error(e);
+    if (z.rodzaj === "serwer") komunikat("Błąd startu: " + e.message, true);
+    else pokazStart(e.message);
   }
+}
+
+async function start() {
+  // serwer.py działa tylko lokalnie – na stronie z linka od razu wybór folderu
+  const lokalnie = ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname);
+  const serwer = lokalnie ? await ZrodloSerwer.wykryj() : null;
+  if (serwer) uruchom(serwer);
+  else pokazStart();
 }
 start();
 
 // Dostęp z konsoli do testów.
-window.edytor = { stan, widok, historia };
+window.edytor = { stan, widok, historia, uruchom };

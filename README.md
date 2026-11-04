@@ -4,7 +4,17 @@ Prosty edytor map `.dmm` w przeglądarce, z interfejsem budowania jak w RimWorld
 Czyta kod DM repozytorium, wyświetla mapę z prawdziwych ikon `.dmi` i zapisuje mapę w formacie TGM.
 Plik wczytany i zapisany bez zmian jest identyczny z oryginałem.
 
-## Uruchomienie
+## Z linka (bez instalowania)
+
+Otwórz stronę edytora w Chrome albo Edge i kliknij **Wybierz folder repozytorium**. Wskaż główny folder repo, ten z plikiem `.dme`.
+Przeglądarka zapyta o zgodę na dostęp. Edytor czyta kod i ikony prosto z dysku i zapisuje zmiany do plików `.dmm`.
+Nic nie jest wysyłane do internetu. Katalog typów i szablony trzyma przeglądarka (IndexedDB), osobno dla każdego repo.
+
+W Firefoksie i Safari folder też da się wczytać, ale „Zapisz” pobiera wtedy plik `.dmm` do ręcznej podmiany w repo.
+
+Strona to zawartość folderu `web/`. Workflow `.github/workflows/strona.yml` publikuje ją na GitHub Pages przy każdym pushu na `main`.
+
+## Uruchomienie lokalne (serwer)
 
 Wymagany jest tylko Python 3.10+, bez dodatkowych pakietów.
 
@@ -46,7 +56,9 @@ Przy pierwszym starcie i po zmianie plików `.dm` czyta kod (ok. 8 s). Wynik trz
 
 ## Pliki
 
-- `ekstraktor.py`: przybliżony parser DM; wyciąga typy atomów i zmienne wyglądu (z makrami, #define, #if).
+- `web/js/ekstraktor.js`: przybliżony parser DM w przeglądarce; wyciąga typy atomów i zmienne wyglądu (z makrami, #define, #if). Daje taki sam wynik jak `ekstraktor.py`.
+- `web/js/zrodlo.js`: skąd brać pliki (folder w Chrome/Edge, folder tylko do odczytu, serwer.py).
+- `ekstraktor.py`: ta sama logika w Pythonie, używana przez `serwer.py`.
 - `serwer.py`: serwuje interfejs, pliki repo i zapisuje `.dmm` (tylko pliki `.dmm` wewnątrz repo).
 - `web/kategorie.json`: kategorie menu i tryby stawiania. Można je edytować bez ruszania kodu.
 - `web/js/`: `dmi.js` (ikony), `dmm.js` (odczyt i zapis map), `typy.js` (dziedziczenie zmiennych),

@@ -1,5 +1,7 @@
 // Baza typów z ekstraktora i wyliczanie zmiennych z dziedziczeniem.
 
+import { zrodlo } from "./zrodlo.js";
+
 const DOMYSLNE = {
   "/area": { layer: 1, plane: 0 },
   "/turf": { layer: 2, plane: 0 },
@@ -12,9 +14,8 @@ let typy = {};
 let uzycie = {};
 const pamiec = new Map();
 
-export async function wczytajTypy(odswiez = false) {
-  const odp = await fetch("/api/typy" + (odswiez ? "?odswiez=1" : ""));
-  const dane = await odp.json();
+export async function wczytajTypy(postep = () => {}) {
+  const dane = await zrodlo.typy(postep);
   typy = dane.typy;
   uzycie = dane.uzycie || {};
   pamiec.clear();
