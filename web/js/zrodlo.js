@@ -191,9 +191,19 @@ export class ZrodloFolder extends ZrodloLokalne {
     return wynik;
   }
 
+  // Nowa mapa: tworzy brakujące katalogi i plik.
+  async utworzPlik(p) {
+    let kat = this.uchwyt;
+    const cz = p.split("/");
+    for (const c of cz.slice(0, -1)) kat = await kat.getDirectoryHandle(c, { create: true });
+    this.katalogi.clear();
+    this.spisy.clear();
+    this.katalogi.set("", this.uchwyt);
+    return await kat.getFileHandle(cz[cz.length - 1], { create: true });
+  }
+
   async zapisz(p, tekst) {
-    const u = await this.uchwytPliku(p);
-    if (!u) throw new Error("Nie znalazłem pliku " + p);
+    const u = (await this.uchwytPliku(p)) || (await this.utworzPlik(p));
     if ((await u.queryPermission({ mode: "readwrite" })) !== "granted" && (await u.requestPermission({ mode: "readwrite" })) !== "granted") {
       throw new Error("Przeglądarka nie dała zgody na zapis");
     }

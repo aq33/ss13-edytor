@@ -250,6 +250,27 @@ export class Widok {
     for (const fn of this.nakladki) fn(g, this);
   }
 
+  // Cały bieżący poziom jako PNG (res = piksele na kafelek). Kawałki rysuję bez pamięci podręcznej.
+  async eksport(res) {
+    const m = this.mapa;
+    const c = new OffscreenCanvas(m.szer * res, m.wys * res);
+    const g = c.getContext("2d");
+    g.imageSmoothingEnabled = false;
+    g.fillStyle = "#000";
+    g.fillRect(0, 0, c.width, c.height);
+    const kawalek = { c: new OffscreenCanvas(KAWALEK * res, KAWALEK * res), res, z: this.z };
+    kawalek.g = kawalek.c.getContext("2d");
+    for (let cy = 0; cy < Math.ceil(m.wys / KAWALEK); cy++) {
+      for (let cx = 0; cx < Math.ceil(m.szer / KAWALEK); cx++) {
+        kawalek.cx = cx; kawalek.cy = cy;
+        this._narysujKawalek(kawalek);
+        g.drawImage(kawalek.c, cx * KAWALEK * res, cy * KAWALEK * res);
+      }
+      await new Promise((r) => setTimeout(r, 0));
+    }
+    return await c.convertToBlob({ type: "image/png" });
+  }
+
   // Do nakładek: rysuje atom w kafelku (podgląd przed postawieniem).
   rysujAtom(g, atom, x, y, alfa = 0.6) {
     const el = elementAtomu(atom);

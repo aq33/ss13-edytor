@@ -13,6 +13,17 @@
   <span class="tytul">Edytor map</span>
   <button id="b-otworz" title="Otwórz mapę">Otwórz</button>
   <button id="b-zapisz" title="Zapisz (Ctrl+S)">Zapisz</button>
+  <span class="menu-wrap">
+    <button id="b-menu-mapy" title="Operacje na całej mapie">Mapa ▾</button>
+    <div id="menu-mapy" class="panel menu ukryty">
+      <button data-m="nowa">Nowa mapa… <kbd>Ctrl</kbd><kbd>N</kbd></button>
+      <button data-m="rozmiar">Zmień rozmiar…</button>
+      <button data-m="dodaj-z">Dodaj poziom nad bieżącym</button>
+      <button data-m="usun-z">Usuń bieżący poziom</button>
+      <button data-m="szukaj">Szukaj i zamień… <kbd>Ctrl</kbd><kbd>F</kbd></button>
+      <button data-m="png">Eksport do PNG…</button>
+    </div>
+  </span>
   <span class="sep"></span>
   <button id="b-cofnij" title="Cofnij (Ctrl+Z)">↶</button>
   <button id="b-ponow" title="Ponów (Ctrl+Y)">↷</button>
@@ -23,6 +34,8 @@
   <span style="flex:1"></span>
   <button id="b-samouczek" title="Pokaż albo schowaj samouczek">Samouczek</button>
 </div>
+
+<div id="karty" class="ukryty"></div>
 
 <div id="samouczek" class="panel ukryty"></div>
 
@@ -52,6 +65,38 @@
 </div>
 
 <div id="inspekcja" class="panel ukryty"></div>
+
+<div id="szukaj-panel" class="panel ukryty">
+  <div class="pasek"><span class="naglowek">Szukaj i zamień</span><span style="flex:1"></span><button id="sz-zamknij" title="Zamknij">✕</button></div>
+  <label class="pole"><span>Typ</span><input id="sz-typ" list="lista-typow" placeholder="/obj/machinery/light" spellcheck="false"></label>
+  <div class="szybkie">
+    <label><input type="checkbox" id="sz-podtypy" checked> z podtypami</label>
+    <select id="sz-zakres">
+      <option value="poziom">bieżący poziom</option>
+      <option value="wszystkie">wszystkie poziomy</option>
+      <option value="zaznaczenie">zaznaczenie</option>
+    </select>
+  </div>
+  <div class="szybkie">
+    <button id="sz-szukaj" class="wlaczony">Szukaj</button>
+    <button id="sz-z-kafelka" title="Weź typ z kafelka zaznaczonego w inspekcji">Typ z kafelka</button>
+    <button id="sz-zaznacz" title="Przeciągnij prostokąt na mapie">Zaznacz obszar</button>
+  </div>
+  <div id="sz-wyniki"></div>
+  <div class="sekcja">Wszystkie znalezione:</div>
+  <label class="pole"><span>Zamień na</span><input id="sz-na" list="lista-typow" spellcheck="false"></label>
+  <div class="szybkie">
+    <label><input type="checkbox" id="sz-zachowaj" checked> zachowaj zmienne</label>
+  </div>
+  <div class="szybkie">
+    <button id="sz-zamien" class="wymaga-wynikow" disabled>Zamień</button>
+    <button id="sz-edytuj" class="wymaga-wynikow" disabled>Edytuj zmienne…</button>
+    <button id="sz-usun" class="wymaga-wynikow" disabled>Usuń</button>
+  </div>
+</div>
+
+<datalist id="lista-typow"></datalist>
+<div id="okno-dialog" class="okno ukryty"><div class="panel okno-tresc start-tresc"></div></div>
 <div id="info" class="panel ukryty"></div>
 <div id="podpowiedz" class="ukryty"></div>
 

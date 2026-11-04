@@ -54,6 +54,9 @@ Przy pierwszym starcie i po zmianie plików `.dm` czyta kod (ok. 8 s). Wynik trz
 | Samouczek | przycisk na górze; 14 lekcji odhacza się samo, gdy zrobisz daną rzecz |
 | Kopiuj / wklej | `C` zaznacza prostokąt, potem klik wkleja (kursor = lewy górny róg); `V` wraca do wklejania |
 | Szablony | „Zapisz jako szablon” zapisuje schowek do `szablony/`; wklejasz je z kategorii **Szablony** w Architekcie |
+| Zakładki | każda otwarta mapa to osobna zakładka (własna historia cofania, poziom i kamera); ✕ albo środkowy przycisk zamyka |
+| Menu **Mapa ▾** | nowa mapa (`Ctrl+N`), zmiana rozmiaru z wyborem, gdzie zostaje stara zawartość, dodanie i usunięcie poziomu Z, eksport poziomu do PNG |
+| Szukaj i zamień | `Ctrl+F`: typ (z podtypami albo dokładnie), zakres: poziom, wszystkie poziomy albo zaznaczony prostokąt. Znalezione można zamienić na inny typ, usunąć albo ustawić im zmienne naraz (edycja wielu obiektów) |
 | Inspekcja kafelka | bez narzędzia klik na kafelek: lista atomów z obracaniem, usuwaniem, pipetą (⧉) i edycją zmiennych (✎) |
 | Przesuwanie widoku | `WASD`, strzałki, środkowy albo prawy przycisk z przeciągnięciem |
 | Przybliżanie | kółko myszy |
@@ -78,6 +81,9 @@ Przy pierwszym starcie i po zmianie plików `.dm` czyta kod (ok. 8 s). Wynik trz
 - stary system tg (`code/__HELPERS/icon_smoothing.dm`): stoły, dywany itp., także wariant diagonalny.
 
 ## Ograniczenia
+
+- Nakładki, które gra dokłada w kodzie (np. ekran APC, światełka śluz, wypełnienie okien), się nie rysują. Edytor pokazuje stan ikony z kodu, tak jak StrongDMM bez pluginów.
+- Zmiany rozmiaru mapy i liczby poziomów nie da się cofnąć: czyszczą historię.
 
 - Podgląd przed postawieniem nie wygładza się z sąsiadami. Robi to dopiero postawiony obiekt.
 - Wklejanie nie obraca fragmentu. Obszary (`/area`) zostają te z celu.

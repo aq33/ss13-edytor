@@ -217,6 +217,7 @@ class Obsluga(BaseHTTPRequestHandler):
             return self._json({"blad": "można zapisywać tylko pliki .dmm w repo"}, 400)
         dlugosc = int(self.headers.get("Content-Length", "0"))
         tresc = self.rfile.read(dlugosc)
+        os.makedirs(os.path.dirname(sciezka), exist_ok=True)  # nowa mapa w nowym folderze
         tymczasowy = sciezka + ".zapis"
         with open(tymczasowy, "wb") as f:
             f.write(tresc)

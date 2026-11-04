@@ -7,6 +7,7 @@ import { autolacz, laczySie } from "./polaczenia.js";
 import { initSamouczek, zdarzenie, pokazSamouczek } from "./samouczek.js";
 import { zrodlo, ustawZrodlo, ZrodloFolder, ZrodloPliki, ZrodloSerwer, ZrodloGithub } from "./zrodlo.js";
 import { ustawRegulySciany, jestScienny, przyciagnij, atomNaScianie } from "./sciana.js";
+import { initOperacje, initSzukanie, nowaMapa, zmienRozmiar, dodajPoziom, usunPoziom, szukaj, przelaczSzukanie, wynikiSzukania, eksportPng } from "./operacje.js";
 
 const $ = (s) => document.querySelector(s);
 const plotno = $("#plotno");
@@ -30,6 +31,8 @@ const stan = {
   schowek: null,            // { szer, wys, kafelki: [{ dx, dy, atomy }] }
   szablony: [],
   edycjaZm: null,           // indeks atomu z otwartym formularzem zmiennych
+  karty: [],                // otwarte mapy (zakładki)
+  karta: -1,
   ostatnie: { sciana: "/turf/closed/wall", podloga: "/turf/open/floor/plating" }, // do narzędzia Pokój
 };
 
@@ -295,28 +298,130 @@ function odswiezPrzyciskiNarzedzi() {
 
 // ---------------------------------------------------------------- mapa
 
+// Zakładki: każda otwarta mapa ma własną historię, poziom, kamerę i znacznik zmian.
+const biezacaKarta = () => stan.karty[stan.karta];
+
+function zapamietajKarte() {
+  const k = biezacaKarta();
+  if (!k) return;
+  k.wstecz = historia.wstecz;
+  k.naprzod = historia.naprzod;
+  k.zmiany = stan.zmiany;
+  k.z = widok.z;
+  k.kam = { ...widok.kam };
+  k.wybrany = stan.wybrany;
+}
+
+function pokazKarte(k, nowa) {
+  stan.mapa = k.mapa;
+  historia.wstecz = k.wstecz;
+  historia.naprzod = k.naprzod;
+  stan.wybrany = k.wybrany;
+  stan.edycjaZm = null;
+  stan.przeciaganie = null;
+  if (stan.narzedzie?.rodzaj === "przenies") stan.narzedzie = { rodzaj: "przenies" };
+  widok.ustawMape(k.mapa);
+  widok.z = Math.min(k.z, k.mapa.poziomy);
+  if (nowa || !k.kam) wysrodkuj(); else Object.assign(widok.kam, k.kam);
+  ustawZmiany(k.zmiany);
+  odswiezTytul();
+  pokazPoziomy();
+  pokazInspekcje();
+  pokazKarty();
+  // wyniki szukania i zaznaczenie dotyczą konkretnej mapy
+  stan.zaznaczenie = null;
+  if (!$("#szukaj-panel").classList.contains("ukryty")) szukaj();
+  widok.rysuj();
+}
+
+function przelaczKarte(i) {
+  if (i === stan.karta || !stan.karty[i]) return;
+  zapamietajKarte();
+  stan.karta = i;
+  pokazKarte(stan.karty[i], false);
+}
+
+function dodajKarte(mapa) {
+  zapamietajKarte();
+  stan.karty.push({ mapa, wstecz: [], naprzod: [], zmiany: false, z: 1, kam: null, wybrany: null });
+  stan.karta = stan.karty.length - 1;
+  pokazKarte(biezacaKarta(), true);
+}
+
+function zamknijKarte(i) {
+  zapamietajKarte();
+  const k = stan.karty[i];
+  if (k.zmiany && !confirm(`Mapa ${k.mapa.plik} ma niezapisane zmiany. Zamknąć bez zapisu?`)) return;
+  stan.karty.splice(i, 1);
+  if (!stan.karty.length) {
+    stan.karta = -1;
+    stan.mapa = null;
+    widok.ustawMape(null);
+    ustawZmiany(false);
+    historia.wstecz = []; historia.naprzod = [];
+    pokazKarty(); pokazPoziomy(); pokazInspekcje(); odswiezTytul();
+    $("#b-otworz").click();
+    return;
+  }
+  const bylaBiezaca = i === stan.karta;
+  if (i < stan.karta) stan.karta--;
+  else if (bylaBiezaca) stan.karta = Math.max(0, i - 1);
+  if (bylaBiezaca) pokazKarte(biezacaKarta(), false);
+  else pokazKarty();
+}
+
+function pokazKarty() {
+  const el = $("#karty");
+  el.innerHTML = "";
+  el.classList.toggle("ukryty", !stan.karty.length);
+  document.body.classList.toggle("z-kartami", stan.karty.length > 0);
+  stan.karty.forEach((k, i) => {
+    const b = document.createElement("div");
+    b.className = "karta" + (i === stan.karta ? " wlaczony" : "");
+    b.title = k.mapa.plik;
+    const n = document.createElement("span");
+    n.textContent = k.mapa.plik.split("/").pop() + ((i === stan.karta ? stan.zmiany : k.zmiany) ? " •" : "");
+    const x = document.createElement("button");
+    x.textContent = "✕";
+    x.title = "Zamknij";
+    x.onclick = (e) => { e.stopPropagation(); zamknijKarte(i); };
+    b.append(n, x);
+    b.onclick = () => przelaczKarte(i);
+    b.onauxclick = (e) => { if (e.button === 1) zamknijKarte(i); };
+    el.append(b);
+  });
+  const plus = document.createElement("button");
+  plus.className = "karta-plus";
+  plus.textContent = "+";
+  plus.title = "Otwórz albo utwórz mapę";
+  plus.onclick = () => $("#b-otworz").click();
+  el.append(plus);
+}
+
+function odswiezTytul() {
+  const m = stan.mapa;
+  $("#nazwa-mapy").textContent = m ? `${zrodlo.nazwa}: ${m.plik} — ${m.szer}×${m.wys}, poziomów: ${m.poziomy}` : "nie wczytano mapy";
+}
+
+// Wczytuje wszystkie ikony użyte w mapie, żeby obraz nie „doskakiwał”.
+async function wczytajIkonyMapy(mapa) {
+  const pliki = new Set();
+  for (const p of mapa.prefaby) for (const a of p.atomy) { const i = zmienneAtomu(a).icon; if (i) pliki.add(i); }
+  let gotowe = 0;
+  await Promise.all([...pliki].map((p) => ikona(p).then(() => { gotowe++; if (gotowe % 20 === 0) ladowanie(`Ikony: ${gotowe}/${pliki.size}`); })));
+}
+
 async function otworzMape(plik) {
-  if (stan.zmiany && !confirm("Masz niezapisane zmiany. Otworzyć inną mapę?")) return;
+  const jest = stan.karty.findIndex((k) => k.mapa.plik === plik);
+  if (jest >= 0) { przelaczKarte(jest); return; }
   ladowanie("Wczytuję " + plik + "…");
   try {
     const tekst = await zrodlo.tekst(plik);
     if (tekst === null) throw new Error("nie ma pliku " + plik);
     const mapa = Mapa.parsuj(tekst, plik);
-    // Najpierw wczytuję wszystkie ikony z mapy, żeby obraz nie „doskakiwał”.
-    const pliki = new Set();
-    for (const p of mapa.prefaby) for (const a of p.atomy) { const i = zmienneAtomu(a).icon; if (i) pliki.add(i); }
-    let gotowe = 0;
-    await Promise.all([...pliki].map((p) => ikona(p).then(() => { gotowe++; if (gotowe % 20 === 0) ladowanie(`Ikony: ${gotowe}/${pliki.size}`); })));
-    stan.mapa = mapa;
-    stan.wybrany = null;
-    historia.wstecz = []; historia.naprzod = [];
-    ustawZmiany(false);
-    widok.ustawMape(mapa);
-    wysrodkuj();
-    pokazPoziomy();
-    $("#nazwa-mapy").textContent = `${zrodlo.nazwa}: ${plik} — ${mapa.szer}×${mapa.wys}, poziomów: ${mapa.poziomy}`;
+    await wczytajIkonyMapy(mapa);
+    dodajKarte(mapa);
     try { localStorage.setItem("ostatnia-mapa:" + zrodlo.nazwa, plik); } catch {}
-    pokazInspekcje();
   } catch (e) {
     komunikat("Nie udało się wczytać mapy: " + e.message, true);
     console.error(e);
@@ -367,8 +472,12 @@ function ustawPoziom(z) {
 }
 
 function ustawZmiany(v) {
+  const bylo = stan.zmiany;
   stan.zmiany = v;
+  const k = biezacaKarta();
+  if (k) k.zmiany = v;
   $("#b-zapisz").classList.toggle("zmiany", v);
+  if (bylo !== v) pokazKarty();
 }
 
 // Po zapisie w trybie GitHub: plik się pobrał, teraz trzeba go wgrać (GitHub sam zrobi fork i PR).
@@ -402,15 +511,14 @@ async function zapisz() {
 
 const kluczPola = (x, y) => x + "," + y;
 
-function zmienKafelek(x, y, noweAtomy) {
+function zmienKafelek(x, y, noweAtomy, z = widok.z) {
   const m = stan.mapa;
-  const z = widok.z;
   const przed = m.prefab(x, y, z);
   const po = m.dodajPrefab(noweAtomy);
   if (przed === po) return;
   m.ustaw(x, y, z, po);
   historia.zmiana(z + ":" + x + ":" + y, przed, po);
-  widok.uniewaznij(x, y);
+  if (z === widok.z) widok.uniewaznij(x, y);
 }
 
 function zastosujHistorie(wpis, kierunek) {
@@ -568,6 +676,16 @@ function wklejNa(atomyCelu, atomySchowka) {
 function wykonaj() {
   const n = stan.narzedzie;
   const pola = projekt();
+  if (n.rodzaj === "zaznacz") {
+    if (!pola.length) return;
+    const xs = pola.map((p) => p.x), ys = pola.map((p) => p.y);
+    stan.zaznaczenie = { x0: Math.min(...xs), y0: Math.min(...ys), x1: Math.max(...xs), y1: Math.max(...ys), z: widok.z };
+    anulujNarzedzie();
+    $("#sz-zakres").value = "zaznaczenie";
+    przelaczSzukanie(true);
+    szukaj();
+    return;
+  }
   if (n.rodzaj === "kopiuj") {
     const s = kopiuj(pola);
     if (!s || !s.kafelki.length) { komunikat("Nic do skopiowania"); return; }
@@ -653,6 +771,29 @@ widok.nakladki.push((g, w) => {
     for (let r2 = w0; r2 <= w1; r2++) { const y = Math.round((r2 - w.kam.y) * z) + 0.5; g.moveTo((k0 - w.kam.x) * z, y); g.lineTo((k1 - w.kam.x) * z, y); }
     g.stroke();
   }
+  // wyniki szukania na bieżącym poziomie
+  const znalezione = wynikiSzukania();
+  if (znalezione.length) {
+    g.strokeStyle = "#e0c050";
+    g.fillStyle = "rgba(224,192,80,0.18)";
+    g.lineWidth = Math.max(1, z / 16);
+    for (const r of znalezione) {
+      if (r.z !== w.z) continue;
+      const p = w.naEkran(r.x, r.y);
+      g.fillRect(p.sx, p.sy, z, z);
+      g.strokeRect(p.sx + 0.5, p.sy + 0.5, z - 1, z - 1);
+    }
+  }
+  const zaz = stan.zaznaczenie;
+  if (zaz && zaz.z === w.z) {
+    const p = w.naEkran(zaz.x0, zaz.y1);
+    g.save();
+    g.setLineDash([6, 4]);
+    g.strokeStyle = "#7fb0ff";
+    g.lineWidth = 2;
+    g.strokeRect(p.sx + 1, p.sy + 1, (zaz.x1 - zaz.x0 + 1) * z - 2, (zaz.y1 - zaz.y0 + 1) * z - 2);
+    g.restore();
+  }
   if (stan.wybrany) {
     const p = w.naEkran(stan.wybrany.x, stan.wybrany.y);
     g.strokeStyle = "#c7a846";
@@ -680,9 +821,9 @@ widok.nakladki.push((g, w) => {
   }
   for (const { x, y, atom, atomy: wklejane } of pola) {
     const p = w.naEkran(x, y);
-    if (n.rodzaj === "rozbiorka" || n.rodzaj === "kopiuj" || n.rodzaj === "podloga" || (n.rodzaj === "przenies" && !n.chwyt)) {
+    if (n.rodzaj === "rozbiorka" || n.rodzaj === "kopiuj" || n.rodzaj === "podloga" || n.rodzaj === "zaznacz" || (n.rodzaj === "przenies" && !n.chwyt)) {
       const shift = n.rodzaj === "rozbiorka" && (stan.przeciaganie ? stan.przeciaganie.shift : ostatniaMysz?.shiftKey);
-      g.fillStyle = n.rodzaj === "kopiuj" || n.rodzaj === "przenies" ? "rgba(80,140,220,0.3)"
+      g.fillStyle = n.rodzaj === "kopiuj" || n.rodzaj === "przenies" || n.rodzaj === "zaznacz" ? "rgba(80,140,220,0.3)"
         : n.rodzaj === "podloga" ? "rgba(220,150,50,0.35)" : shift ? "rgba(120,20,20,0.6)" : "rgba(192,69,58,0.35)";
       g.fillRect(p.sx, p.sy, z, z);
       continue;
@@ -860,6 +1001,7 @@ function pokazPodpowiedz(e) {
   let tekst;
   if (n.rodzaj === "rozbiorka") tekst = e.shiftKey ? "Rozbiórka + Shift – usuwa wszystko, zostaje sam kosmos" : "Rozbiórka – usuwa obiekty, ściany zostają poszyciem · z Shiftem: wszystko do kosmosu";
   else if (n.rodzaj === "kopiuj") tekst = "Kopiuj – zaznacz prostokąt";
+  else if (n.rodzaj === "zaznacz") tekst = "Zaznacz obszar dla szukania i zamiany – przeciągnij";
   else if (n.rodzaj === "przenies") tekst = n.chwyt ? "Przenieś – kliknij w nowe miejsce (PPM anuluje)" : "Przenieś – zaznacz prostokąt do przeniesienia";
   else if (n.rodzaj === "podloga") tekst = "Usuń podłogę – przeciągnij; podłoga zamienia się w kosmos, obiekty zostają";
   else if (n.rodzaj === "wklej") tekst = `Wklej ${n.schowek.szer}×${n.schowek.wys}${n.nazwa ? " „" + n.nazwa + "”" : ""} – kursor to lewy górny róg`;
@@ -990,7 +1132,7 @@ function petlaRuchu() {
 }
 
 window.addEventListener("keydown", (e) => {
-  if (e.target.tagName === "INPUT") {
+  if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT" || e.target.closest?.("#okno-dialog")) {
     if (e.key === "Escape") e.target.blur();
     return;
   }
@@ -998,6 +1140,8 @@ window.addEventListener("keydown", (e) => {
   if (e.ctrlKey && k === "s") { e.preventDefault(); zapisz(); return; }
   if (e.ctrlKey && k === "z") { e.preventDefault(); e.shiftKey ? ponow() : cofnij(); return; }
   if (e.ctrlKey && k === "y") { e.preventDefault(); ponow(); return; }
+  if (e.ctrlKey && k === "f") { e.preventDefault(); if (stan.mapa) przelaczSzukanie(true); return; }
+  if (e.ctrlKey && k === "n") { e.preventDefault(); nowaMapa(); return; }
   if (e.ctrlKey) return;
   if (["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright"].includes(k)) {
     const pusto = !wcisniete.size;
@@ -1022,7 +1166,10 @@ window.addEventListener("keydown", (e) => {
 });
 window.addEventListener("keyup", (e) => wcisniete.delete(e.key.toLowerCase()));
 window.addEventListener("blur", () => wcisniete.clear());
-window.addEventListener("beforeunload", (e) => { if (stan.zmiany) { e.preventDefault(); e.returnValue = ""; } });
+window.addEventListener("beforeunload", (e) => {
+  zapamietajKarte();
+  if (stan.karty.some((k) => k.zmiany)) { e.preventDefault(); e.returnValue = ""; }
+});
 
 // ---------------------------------------------------------------- przyciski
 
@@ -1036,6 +1183,46 @@ function przelaczNarzedzie(rodzaj, dodatki = {}) {
 }
 const ustawRozbiorke = () => przelaczNarzedzie("rozbiorka");
 const ustawWklej = () => { if (stan.schowek) przelaczNarzedzie("wklej", { schowek: stan.schowek }); };
+
+// Przeskok do kafelka (np. z wyników szukania): poziom, kamera, inspekcja.
+function pokazKafelek(x, y, z) {
+  if (z !== widok.z) ustawPoziom(z);
+  const r = plotno.getBoundingClientRect();
+  widok.kam.zoom = Math.max(widok.kam.zoom, 32);
+  widok.kam.x = x - 1 + 0.5 - r.width / widok.kam.zoom / 2;
+  widok.kam.y = stan.mapa.wys - y + 0.5 - r.height / widok.kam.zoom / 2;
+  stan.wybrany = { x, y };
+  stan.edycjaZm = null;
+  pokazInspekcje();
+  widok.rysuj();
+}
+
+initOperacje({
+  stan, widok, historia, komunikat, ladowanie, ustawZmiany, odswiezTytul, pokazPoziomy, ustawPoziom, pokazInspekcje,
+  zmienKafelek, pokazKafelek, zdarzenie, dodajKarte: async (mapa) => { await wczytajIkonyMapy(mapa); dodajKarte(mapa); },
+  listaMap: () => listaMap,
+  zacznijZaznaczanie: () => { stan.narzedzie = { rodzaj: "zaznacz" }; odswiezPrzyciskiNarzedzi(); komunikat("Przeciągnij prostokąt na mapie"); },
+});
+initSzukanie();
+
+// Menu „Mapa” na górnym pasku.
+const MENU_MAPY = {
+  nowa: nowaMapa,
+  rozmiar: zmienRozmiar,
+  "dodaj-z": dodajPoziom,
+  "usun-z": usunPoziom,
+  szukaj: () => przelaczSzukanie(true),
+  png: eksportPng,
+};
+$("#b-menu-mapy").onclick = (e) => { e.stopPropagation(); $("#menu-mapy").classList.toggle("ukryty"); };
+for (const b of document.querySelectorAll("#menu-mapy [data-m]")) {
+  b.onclick = () => {
+    $("#menu-mapy").classList.add("ukryty");
+    if (b.dataset.m !== "nowa" && !stan.mapa) return komunikat("Najpierw otwórz mapę", true);
+    MENU_MAPY[b.dataset.m]();
+  };
+}
+window.addEventListener("click", () => $("#menu-mapy").classList.add("ukryty"));
 
 $("#b-architekt").onclick = przelaczArchitekta;
 $("#b-rozbiorka").onclick = ustawRozbiorke;
@@ -1074,7 +1261,9 @@ $("#b-otworz").onclick = () => { $("#okno-map").classList.remove("ukryty"); $("#
 $("#zamknij-mapy").onclick = () => $("#okno-map").classList.add("ukryty");
 $("#szukaj-mapy").oninput = pokazListeMap;
 $("#b-zmien-repo").onclick = () => {
-  if (stan.zmiany && !confirm("Masz niezapisane zmiany. Zmienić repozytorium?")) return;
+  zapamietajKarte();
+  if (stan.karty.some((k) => k.zmiany) && !confirm("Masz niezapisane zmiany. Zmienić repozytorium?")) return;
+  for (const k of stan.karty) k.zmiany = false;
   stan.zmiany = false;
   location.reload();
 };

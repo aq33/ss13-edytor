@@ -141,6 +141,50 @@ export class Mapa {
     return m;
   }
 
+  // Nowa mapa wypełniona jednym prefabem (zwykle kosmos + /area/space).
+  static nowa(plik, szer, wys, poziomy, atomy) {
+    const m = new Mapa();
+    m.plik = plik;
+    m.szer = szer; m.wys = wys; m.poziomy = poziomy;
+    m.dlugoscKlucza = 1;
+    const idx = m.dodajPrefab(atomy);
+    for (let z = 0; z < poziomy; z++) m.siatki.push(new Int32Array(szer * wys).fill(idx));
+    return m;
+  }
+
+  // Zmiana rozmiaru. dx, dy – o ile przesunąć starą zawartość (w kafelkach, w prawo i w górę).
+  // Nowe pola dostają prefab wypelnienie.
+  zmienRozmiar(szer, wys, dx, dy, wypelnienie) {
+    const nowe = this.siatki.map((stara) => {
+      const s = new Int32Array(szer * wys).fill(wypelnienie);
+      for (let y = 1; y <= this.wys; y++) {
+        const ny = y + dy;
+        if (ny < 1 || ny > wys) continue;
+        for (let x = 1; x <= this.szer; x++) {
+          const nx = x + dx;
+          if (nx < 1 || nx > szer) continue;
+          s[(ny - 1) * szer + (nx - 1)] = stara[(y - 1) * this.szer + (x - 1)];
+        }
+      }
+      return s;
+    });
+    this.siatki = nowe;
+    this.szer = szer;
+    this.wys = wys;
+  }
+
+  dodajPoziom(wypelnienie, poz = this.poziomy) {
+    this.siatki.splice(poz, 0, new Int32Array(this.szer * this.wys).fill(wypelnienie));
+    this.poziomy++;
+  }
+
+  usunPoziom(z) {
+    if (this.poziomy <= 1) return false;
+    this.siatki.splice(z - 1, 1);
+    this.poziomy--;
+    return true;
+  }
+
   dodajPrefab(atomy, klucz = null) {
     const podpis = podpisPrefabu(atomy);
     const jest = this.poPodpisie.get(podpis);

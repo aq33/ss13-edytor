@@ -31,12 +31,39 @@ button.duzy { padding: 7px 10px; font-size: 13px; }
 input[type=search] { background: #101315; color: var(--tekst); border: 1px solid var(--ramka); padding: 4px 6px; font: inherit; }
 input[type=checkbox] { accent-color: var(--wybrany); vertical-align: -2px; }
 
-#gora { position: fixed; top: 0; left: 0; right: 0; height: 34px; display: flex; align-items: center; gap: 4px; padding: 0 8px; border-width: 0 0 1px 0; }
-#gora .tytul { font-weight: 700; margin-right: 8px; color: var(--wybrany); }
-#nazwa-mapy { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#gora { z-index: 6; position: fixed; top: 0; left: 0; right: 0; height: 34px; display: flex; align-items: center; gap: 4px; padding: 0 8px; border-width: 0 0 1px 0; }
+#gora .tytul { font-weight: 700; margin-right: 8px; color: var(--wybrany); white-space: nowrap; flex: none; }
+#gora button, #gora .menu-wrap, #poziomy { white-space: nowrap; flex: none; }
+#poziomy { display: flex; gap: 2px; }
+#nazwa-mapy { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1 1 0; min-width: 0; }
 #b-zapisz.zmiany::after { content: " •"; color: var(--wybrany); }
 #poziomy button { padding: 3px 8px; }
 
+.menu-wrap { position: relative; }
+.menu { position: absolute; top: 28px; left: 0; z-index: 30; display: flex; flex-direction: column; min-width: 240px; padding: 4px; }
+.menu button { text-align: left; border-color: transparent; background: transparent; display: flex; gap: 4px; align-items: center; }
+.menu button kbd:first-of-type { margin-left: auto; }
+.menu button:hover { background: var(--przycisk-hover); }
+#szukaj-panel { position: fixed; left: 10px; top: 76px; width: 330px; max-height: calc(100vh - 140px); overflow-y: auto; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; z-index: 3; }
+#szukaj-panel .pasek { display: flex; align-items: center; }
+#szukaj-panel .pasek button { padding: 0 6px; }
+#szukaj-panel .szybkie { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+#szukaj-panel .sekcja { margin-top: 4px; padding-top: 6px; border-top: 1px solid var(--ramka); color: var(--przygaszony); font-size: 12px; }
+#sz-wyniki { max-height: 180px; overflow-y: auto; font-size: 12px; border: 1px solid #2f363c; padding: 4px; background: #111417; }
+#sz-wyniki:empty { display: none; }
+#sz-wyniki .wynik { cursor: pointer; padding: 1px 2px; font-family: Consolas, monospace; }
+#sz-wyniki .wynik:hover { background: var(--przycisk-hover); }
+.pole { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+.pole > span { width: 110px; flex: none; color: var(--przygaszony); font-size: 12px; }
+.pole input:not([type=checkbox]), .pole select { flex: 1; min-width: 0; max-width: none; background: #101315; color: var(--tekst); border: 1px solid var(--ramka); padding: 4px 6px; font: 12px Consolas, monospace; }
+.przyciski-dialogu { justify-content: flex-end; margin-top: 12px; display: flex; gap: 6px; }
+#karty { position: fixed; top: 34px; left: 0; right: 0; height: 26px; display: flex; align-items: stretch; gap: 2px; padding: 2px 6px 0; background: rgba(12,14,16,.92); border-bottom: 1px solid var(--ramka); overflow-x: auto; z-index: 2; }
+#karty .karta { display: flex; align-items: center; gap: 6px; padding: 0 4px 0 10px; background: #1d2226; border: 1px solid #353c43; border-bottom: 0; cursor: pointer; white-space: nowrap; font-size: 12px; color: var(--przygaszony); }
+#karty .karta:hover { color: var(--tekst); }
+#karty .karta.wlaczony { background: var(--panel-jasny); color: #fff; border-color: var(--wybrany); }
+#karty .karta button { padding: 0 4px; font-size: 11px; background: transparent; border: 0; }
+#karty .karta-plus { padding: 0 10px; border-bottom: 0; }
+body.z-kartami #warstwy, body.z-kartami #samouczek { top: 70px; }
 #warstwy { position: fixed; top: 44px; right: 10px; padding: 8px 10px; display: flex; flex-direction: column; gap: 3px; width: 140px; }
 #warstwy .naglowek { margin-bottom: 3px; }
 
