@@ -605,9 +605,41 @@ export async function ekstrahuj(dme, czytaj, postep = () => {}) {
   return { typy, pliki: pliki.length };
 }
 
-// Ile razy każdy typ występuje w słownikach map (do sortowania katalogu).
-export function zliczUzycie(teksty) {
-  const licznik = {};
-  for (const t of teksty) for (const m of t.matchAll(/^(\/[\w/]+)/gm)) licznik[m[1]] = (licznik[m[1]] || 0) + 1;
-  return licznik;
+// Statystyki z map (port statystyki_map z ekstraktor.py): ile razy używany jest typ
+// i jak mapperzy wieszają go na ścianie. montaz[typ][kierunek] = [[zmienna, wartość], ...].
+const KLUCZE_MONTAZU = new Set(["dir", "pixel_x", "pixel_y"]);
+function kierunekMontazu(zm) {
+  const px = parseFloat(zm.pixel_x ?? 0), py = parseFloat(zm.pixel_y ?? 0);
+  if (Number.isNaN(px) || Number.isNaN(py) || Math.max(Math.abs(px), Math.abs(py)) < 16) return null;
+  if (Math.abs(py) >= Math.abs(px)) return py > 0 ? 1 : 2;
+  return px > 0 ? 4 : 8;
+}
+// Ten sam zapis co json.dumps w Pythonie – żeby remisy rozstrzygały się identycznie.
+const podpisPy = (pary) => "[" + pary.map(([k, v]) => `[${JSON.stringify(k)}, ${JSON.stringify(v)}]`).join(", ") + "]";
+
+export function statystykiMap(teksty) {
+  const uzycie = {};
+  const liczniki = new Map();
+  for (const t of teksty) {
+    for (const m of t.matchAll(/^(\/[\w/]+)/gm)) uzycie[m[1]] = (uzycie[m[1]] || 0) + 1;
+    for (const m of t.matchAll(/^(\/[\w/]+)\{\n((?:\t[^\n]*\n)*?)\t\}/gm)) {
+      const zm = {};
+      for (const z of m[2].matchAll(/^\t(\w+) = (.*?);?$/gm)) if (KLUCZE_MONTAZU.has(z[1])) zm[z[1]] = z[2].trim();
+      const d = kierunekMontazu(zm);
+      if (d === null) continue;
+      const pary = Object.entries(zm).sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+      const klucz = m[1] + "|" + d;
+      if (!liczniki.has(klucz)) liczniki.set(klucz, new Map());
+      const w = liczniki.get(klucz);
+      const p = podpisPy(pary);
+      w.set(p, { ile: (w.get(p)?.ile || 0) + 1, pary });
+    }
+  }
+  const montaz = {};
+  for (const [klucz, warianty] of liczniki) {
+    const [typ, d] = klucz.split("|");
+    const najlepszy = [...warianty.entries()].sort((a, b) => b[1].ile - a[1].ile || (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))[0][1];
+    (montaz[typ] ??= {})[d] = najlepszy.pary;
+  }
+  return { uzycie, montaz };
 }

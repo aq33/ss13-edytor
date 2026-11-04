@@ -125,6 +125,13 @@ kbd { display: inline-block; min-width: 18px; padding: 0 4px; margin: 0 1px; bor
 .start-przyciski { display: flex; flex-direction: column; gap: 8px; margin: 14px 0; }
 .start-przyciski button { padding: 10px; font-size: 15px; }
 .start-blad { border: 1px solid var(--zle); background: #2a1715; padding: 6px 10px; margin: 8px 0; }
+.start-github { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; padding: 12px 14px; margin: 12px 0 6px; text-align: left; background: #3d3a28; border: 1px solid var(--wybrany); }
+.start-github:hover { background: #4f4a30; }
+.start-github-tytul { font-size: 16px; font-weight: 700; color: #fff; }
+.start-lub { color: var(--przygaszony); margin-top: 10px; font-size: 12px; }
+.przycisk-link { display: block; text-align: center; padding: 10px; background: #4a4430; border: 1px solid var(--wybrany); color: #fff; text-decoration: none; font-size: 15px; }
+.przycisk-link:hover { background: #5b5438; }
+.start-tresc ol { margin: 0 0 10px; padding-left: 20px; }
 .duzy-plik { display: block; text-align: center; padding: 10px; border: 1px solid var(--wybrany); background: #4a4430; cursor: pointer; margin: 8px 0; }
 .duzy-plik input { display: none; }
 .male { font-size: 12px; }

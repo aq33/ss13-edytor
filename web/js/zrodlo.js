@@ -4,7 +4,7 @@
 // - ZrodloSerwer: lokalny serwer.py (tryb dla deweloperów).
 // Nic nie jest wysyłane w sieć – wszystko dzieje się w przeglądarce.
 
-import { ekstrahuj, zliczUzycie } from "./ekstraktor.js";
+import { ekstrahuj, statystykiMap } from "./ekstraktor.js";
 
 // ---------------------------------------------------------------- IndexedDB (klucz → wartość)
 
@@ -58,7 +58,7 @@ class ZrodloLokalne {
     if (zapisane) {
       postep("Sprawdzam, czy kod się zmienił…");
       const odcisk = await this.odcisk(zapisane.pliki);
-      if (odcisk === zapisane.odcisk) return { typy: zapisane.typy, uzycie: zapisane.uzycie };
+      if (odcisk === zapisane.odcisk && zapisane.montaz) return { typy: zapisane.typy, uzycie: zapisane.uzycie, montaz: zapisane.montaz };
     }
     const dme = await this.dme();
     const czytane = [];
@@ -67,10 +67,10 @@ class ZrodloLokalne {
     const mapy = await this.mapy();
     const teksty = [];
     for (let i = 0; i < mapy.length; i += 32) teksty.push(...(await Promise.all(mapy.slice(i, i + 32).map((m) => this.tekst(m.plik)))));
-    const uzycie = zliczUzycie(teksty.filter(Boolean));
+    const { uzycie, montaz } = statystykiMap(teksty.filter(Boolean));
     const odcisk = await this.odcisk(czytane);
-    await idbZapisz(kluczPamieci, { odcisk, pliki: czytane, typy: wynik.typy, uzycie });
-    return { typy: wynik.typy, uzycie };
+    await idbZapisz(kluczPamieci, { odcisk, pliki: czytane, typy: wynik.typy, uzycie, montaz });
+    return { typy: wynik.typy, uzycie, montaz };
   }
 
   async odcisk(pliki) {
@@ -254,6 +254,46 @@ export class ZrodloPliki extends ZrodloLokalne {
   async zapisz(p, tekst) {
     pobierzJakoPlik(p.split("/").pop(), tekst);
     return "pobrano";
+  }
+}
+
+// ---------------------------------------------------------------- GitHub (bez pobierania repo)
+
+// Katalog typów zbudowany w CI (dane/katalog.json), mapy i ikony z raw.githubusercontent.com
+// z tego samego commita. Zapis pobiera plik .dmm do wgrania na GitHuba.
+export class ZrodloGithub extends ZrodloLokalne {
+  constructor(info) {
+    super();
+    this.rodzaj = "github";
+    this.zapisWMiejscu = false;
+    this.info = info;
+    this.nazwa = info.repo.split("/")[1];
+    this.katalog = null;
+  }
+  static async wykryj() {
+    try {
+      const r = await fetch("dane/info.json", { cache: "no-cache" });
+      if (!r.ok) return null;
+      return new ZrodloGithub(await r.json());
+    } catch { return null; }
+  }
+  async wczytajKatalog() {
+    this.katalog ??= await fetch("dane/katalog.json", { cache: "no-cache" }).then((r) => {
+      if (!r.ok) throw new Error("brak katalogu (" + r.status + ")");
+      return r.json();
+    });
+    return this.katalog;
+  }
+  adres(p) { return `https://raw.githubusercontent.com/${this.info.repo}/${this.info.sha}/` + p.split("/").map(encodeURIComponent).join("/"); }
+  async bajty(p) { const r = await fetch(this.adres(p)); return r.ok ? await r.arrayBuffer() : null; }
+  async tekst(p) { const r = await fetch(this.adres(p)); return r.ok ? await r.text() : null; }
+  async mapy() { return (await this.wczytajKatalog()).mapy; }
+  async typy() { const k = await this.wczytajKatalog(); return { typy: k.typy, uzycie: k.uzycie, montaz: k.montaz }; }
+  async zapisz(p, tekst) { pobierzJakoPlik(p.split("/").pop(), tekst); return "github"; }
+  // Strona GitHuba do wgrania pliku w ten sam folder (GitHub sam zaproponuje fork i PR).
+  linkWgrania(p) {
+    const katalog = p.includes("/") ? p.slice(0, p.lastIndexOf("/")) : "";
+    return `https://github.com/${this.info.repo}/upload/${this.info.galaz}/${katalog.split("/").map(encodeURIComponent).join("/")}`;
   }
 }
 

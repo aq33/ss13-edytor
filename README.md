@@ -8,7 +8,11 @@ Plik wczytany i zapisany bez zmian jest identyczny z oryginałem.
 
 **https://aq33.github.io/ss13-edytor/**
 
-Otwórz stronę edytora w Chrome albo Edge i kliknij **Wybierz folder repozytorium**. Wskaż główny folder repo, ten z plikiem `.dme`.
+Najprościej: kliknij **Edytuj mapy aq33/AquilaStation**. Nie trzeba niczego pobierać.
+Mapy i ikony czytane są prosto z GitHuba, z commita, z którego CI zbudowało katalog (odświeżanie co 3 godziny).
+„Zapisz” pobiera wtedy plik `.dmm`, a edytor podsuwa link do wgrania go na GitHuba. GitHub sam proponuje fork i Pull Request.
+
+Można też pracować na własnym klonie repo. Otwórz stronę w Chrome albo Edge i kliknij **Wybierz folder repozytorium**. Wskaż główny folder repo, ten z plikiem `.dme`.
 Przeglądarka zapyta o zgodę na dostęp. Edytor czyta kod i ikony prosto z dysku i zapisuje zmiany do plików `.dmm`.
 Nic nie jest wysyłane do internetu. Katalog typów i szablony trzyma przeglądarka (IndexedDB), osobno dla każdego repo.
 
@@ -41,6 +45,7 @@ Przy pierwszym starcie i po zmianie plików `.dm` czyta kod (ok. 8 s). Wynik trz
 | Postaw | LPM, przeciąganie zależy od rodzaju: ściany = obrys, podłogi i obszary = wypełnienie, kable/rury/okna = linia, meble = malowanie |
 | Anuluj narzędzie | PPM albo `Esc` |
 | Obrót | `Q` / `E` |
+| Rzeczy na ścianę | plakaty, APC, alarmy, interkomy, włączniki, światła… same przyczepiają się do ściany najbliższej kursorowi (lista typów: `naScianie` w `kategorie.json`). Najpierw próbowany jest podtyp kierunkowy (`/directional/north`, `/north`, `/auto_name/north`), potem to, jak dany typ wisi w naszych mapach, a na końcu `dir` (światła) albo przesunięcie o 32 piksele |
 | Kable i rury | przeciąganie linii samo łączy segmenty: zakręty, końcówki i doczepianie do istniejących instalacji obok |
 | Pokój | `R`: ściany dookoła, podłoga w środku (ostatnio wybrana ściana i podłoga z Architekta) |
 | Rozbiórka | przycisk albo `X`; usuwa obiekty, ściany zamienia na poszycie. Z `Shift` usuwa wszystko do kosmosu |

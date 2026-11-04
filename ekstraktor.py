@@ -635,6 +635,50 @@ def wylicz(wartosc, pp):
 
 
 # ---------------------------------------------------------------------------
+# Statystyki z map: ile razy używany jest typ i jak mapperzy wieszają go na ścianie
+
+_WPIS_ZE_ZMIENNYMI = re.compile(r"^(/[\w/]+)\{\n((?:\t[^\n]*\n)*?)\t\}", re.M)
+_ZMIENNA_WPISU = re.compile(r"^\t(\w+) = (.*?);?$", re.M)
+_KLUCZE_MONTAZU = ("dir", "pixel_x", "pixel_y")
+
+
+def _kierunek_montazu(zm):
+    """Po której stronie kafelka wisi obiekt (1/2/4/8) albo None."""
+    try:
+        px = float(zm.get("pixel_x", 0))
+        py = float(zm.get("pixel_y", 0))
+    except ValueError:
+        return None
+    if max(abs(px), abs(py)) < 16:
+        return None
+    if abs(py) >= abs(px):
+        return 1 if py > 0 else 2
+    return 4 if px > 0 else 8
+
+
+def statystyki_map(teksty):
+    """Zwraca (uzycie, montaz). montaz[typ][kierunek] = najczęstsze [[zmienna, wartość], ...]."""
+    uzycie = {}
+    liczniki = {}
+    for t in teksty:
+        for m in re.finditer(r"^(/[\w/]+)", t, re.M):
+            uzycie[m.group(1)] = uzycie.get(m.group(1), 0) + 1
+        for m in _WPIS_ZE_ZMIENNYMI.finditer(t):
+            zm = {k: v.strip() for k, v in _ZMIENNA_WPISU.findall(m.group(2)) if k in _KLUCZE_MONTAZU}
+            d = _kierunek_montazu(zm)
+            if d is None:
+                continue
+            podpis = json.dumps(sorted(zm.items()))
+            klucz = (m.group(1), d)
+            liczniki.setdefault(klucz, {})
+            liczniki[klucz][podpis] = liczniki[klucz].get(podpis, 0) + 1
+    montaz = {}
+    for (typ, d), warianty in liczniki.items():
+        # przy remisie wygrywa podpis pierwszy alfabetycznie – tak samo w ekstraktor.js
+        najlepszy = sorted(warianty.items(), key=lambda kv: (-kv[1], kv[0]))[0][0]
+        montaz.setdefault(typ, {})[str(d)] = json.loads(najlepszy)
+    return uzycie, montaz
+
 
 def ekstrahuj(dme):
     pp = Preprocesor()

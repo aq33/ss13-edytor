@@ -33,6 +33,19 @@
       "reguly": ["/area"] }
   ],
 
+  "_naScianie": "Typy, które przy stawianiu same przyciągają się do najbliższej ściany (prefiksy ścieżek).",
+  "naScianie": [
+    "/obj/structure/sign", "/obj/machinery/firealarm", "/obj/machinery/airalarm", "/obj/item/radio/intercom",
+    "/obj/structure/extinguisher_cabinet", "/obj/machinery/newscaster", "/obj/machinery/button", "/obj/machinery/light_switch",
+    "/obj/machinery/status_display", "/obj/structure/noticeboard", "/obj/structure/fireaxecabinet", "/obj/machinery/requests_console",
+    "/obj/machinery/defibrillator_mount", "/obj/machinery/power/apc", "/obj/machinery/light", "/obj/machinery/flasher",
+    "/obj/machinery/computer/security/telescreen", "/obj/machinery/vending/wallmed", "/obj/structure/reagent_dispensers/peppertank",
+    "/obj/machinery/turretid", "/obj/item/storage/secure/safe", "/obj/machinery/keycard_auth", "/obj/structure/mirror",
+    "/obj/machinery/door_buttons", "/obj/machinery/embedded_controller", "/obj/structure/closet/emcloset/wall",
+    "/obj/machinery/ai_slipper", "/obj/machinery/barsign", "/obj/item/wallframe"
+  ],
+  "naScianieWyklucz": ["/obj/machinery/light/floor", "/obj/machinery/light/small/built/floor", "/obj/machinery/button/floor"],
+
   "_tryby": "Jak stawia się typ przeciągnięciem: obrys = pusty prostokąt (ściany), prostokat = wypełnienie (podłogi, obszary), linia = linia w kształcie L (kable, rury, okna), pojedynczo = jeden obiekt na kafelek pod kursorem (meble).",
   "tryby": [
     { "prefiks": "/turf/closed", "tryb": "obrys" },

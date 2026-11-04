@@ -12,12 +12,15 @@ const BAZA = { icon: null, icon_state: "", name: "", desc: "", dir: 2, pixel_x: 
 
 let typy = {};
 let uzycie = {};
+let montaze = {};    // jak typ wisi na ścianie w naszych mapach: { kierunek: [[zmienna, wartość]] }
+export const montazTypu = (sciezka) => montaze[sciezka];
 const pamiec = new Map();
 
 export async function wczytajTypy(postep = () => {}) {
   const dane = await zrodlo.typy(postep);
   typy = dane.typy;
   uzycie = dane.uzycie || {};
+  montaze = dane.montaz || {};
   pamiec.clear();
 }
 

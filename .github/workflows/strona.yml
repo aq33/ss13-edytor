@@ -1,9 +1,12 @@
-# Publikuje folder web/ jako stronę GitHub Pages przy każdym pushu na main.
+# Buduje katalog typów AquilaStation i publikuje folder web/ na GitHub Pages.
+# Strona czyta potem mapy i ikony prosto z GitHuba z tego samego commita.
 name: Strona
 
 on:
   push:
     branches: [main]
+  schedule:
+    - cron: "17 */3 * * *"   # co 3 godziny: świeże mapy z mastera Aquili
   workflow_dispatch:
 
 permissions:
@@ -23,6 +26,31 @@ jobs:
       url: ${{ steps.wdrozenie.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Kod i mapy AquilaStation (bez dźwięków i ikon)
+        uses: actions/checkout@v4
+        with:
+          repository: aq33/AquilaStation
+          ref: master
+          path: aquila-repo
+          fetch-depth: 1
+          sparse-checkout: |
+            code
+            nsv13
+            aquila
+            interface
+            _maps
+          sparse-checkout-cone-mode: true
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Katalog typów
+        run: |
+          python buduj_katalog.py --repo aquila-repo --nazwa aq33/AquilaStation --galaz master \
+            --sha "$(git -C aquila-repo rev-parse HEAD)" --wyjscie web/dane
+
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

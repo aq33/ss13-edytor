@@ -83,6 +83,12 @@
     <p>Budowanie map jak w RimWorldzie: ikonki zamiast ścieżek, przeciąganie ścian i podłóg, kable, które łączą się same.</p>
     <p>Wskaż <b>główny folder repozytorium</b> serwera, czyli ten z plikiem <code>.dme</code> (np. <code>AquilaStation</code> albo <code>NSV13-master</code>). Edytor przeczyta kod i ikony prosto z dysku, a zmiany zapisze do plików <code>.dmm</code>.</p>
     <div id="start-blad" class="start-blad ukryty"></div>
+    <button id="start-github" class="start-github ukryty">
+      <span class="start-github-tytul">Edytuj mapy <span id="start-github-nazwa"></span></span>
+      <span>bez pobierania repo: mapy i ikony prosto z GitHuba</span>
+      <span id="start-github-opis" class="przygaszone"></span>
+    </button>
+    <div id="start-lub" class="start-lub ukryty">albo pracuj na własnym klonie repo (zapis prosto do plików):</div>
     <div class="start-przyciski">
       <button id="start-folder" class="duzy wlaczony">Wybierz folder repozytorium</button>
       <button id="start-ponownie" class="duzy ukryty"></button>
@@ -92,6 +98,22 @@
       <label class="duzy-plik">Wczytaj folder repozytorium<input id="start-pliki" type="file" webkitdirectory multiple></label>
     </div>
     <p class="przygaszone male">Nic nie jest wysyłane do internetu, wszystko dzieje się w Twojej przeglądarce. Przeglądarka zapyta o zgodę na dostęp do folderu. Pierwsze wczytanie kodu trwa kilka sekund, kolejne są szybsze. Przed commitem obejrzyj diff w gicie.</p>
+  </div>
+</div>
+
+<div id="okno-wgranie" class="okno ukryty">
+  <div class="panel okno-tresc start-tresc">
+    <div class="start-tytul">Mapa pobrana</div>
+    <p>Plik <code id="wgranie-plik"></code> jest w folderze pobranych. Żeby trafił do gry, wgraj go na GitHuba w miejsce <code id="wgranie-sciezka"></code>:</p>
+    <ol>
+      <li>Kliknij przycisk poniżej (otworzy się strona wgrywania w tym samym folderze repo).</li>
+      <li>Przeciągnij tam pobrany plik i opisz zmianę.</li>
+      <li>Jeśli nie masz uprawnień do repo, GitHub sam utworzy forka i zaproponuje Pull Request.</li>
+    </ol>
+    <div class="start-przyciski">
+      <a id="wgranie-link" class="przycisk-link" target="_blank" rel="noopener">Wgraj na GitHuba</a>
+      <button id="wgranie-zamknij">Zamknij</button>
+    </div>
   </div>
 </div>
 

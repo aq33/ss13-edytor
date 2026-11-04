@@ -51,21 +51,16 @@ def odcisk_kodu(repo):
     return najnowszy
 
 
-def uzycie_w_mapach(repo):
-    """Ile razy każdy typ występuje w słownikach map – do sortowania katalogu."""
-    licznik = {}
-    katalog = os.path.join(repo, "_maps")
-    for korzen, _, pliki in os.walk(katalog):
+def teksty_map(repo):
+    """Treść wszystkich plików .dmm w _maps (do statystyk katalogu)."""
+    for korzen, _, pliki in os.walk(os.path.join(repo, "_maps")):
         for p in pliki:
-            if not p.endswith(".dmm"):
-                continue
-            try:
-                with open(os.path.join(korzen, p), encoding="utf-8", errors="replace") as f:
-                    for m in re.finditer(r"^(/[\w/]+)", f.read(), re.M):
-                        licznik[m.group(1)] = licznik.get(m.group(1), 0) + 1
-            except OSError:
-                pass
-    return licznik
+            if p.endswith(".dmm"):
+                try:
+                    with open(os.path.join(korzen, p), encoding="utf-8", errors="replace") as f:
+                        yield f.read()
+                except OSError:
+                    pass
 
 
 def typy_json(repo, wymus=False):
@@ -86,7 +81,8 @@ def typy_json(repo, wymus=False):
         print("Czytam kod z %s ..." % dme, flush=True)
         dane = ekstraktor.ekstrahuj(dme)
         print("  typów atomów: %d z %d plików" % (len(dane["typy"]), dane["pliki"]), flush=True)
-        wynik = {"typy": dane["typy"], "uzycie": uzycie_w_mapach(repo)}
+        uzycie, montaz = ekstraktor.statystyki_map(teksty_map(repo))
+        wynik = {"typy": dane["typy"], "uzycie": uzycie, "montaz": montaz}
         surowe = gzip.compress(json.dumps(wynik, ensure_ascii=False, separators=(",", ":")).encode("utf-8"), 6)
         with open(plik, "wb") as f:
             f.write(surowe)

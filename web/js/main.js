@@ -5,7 +5,8 @@ import { Widok, ikonkaTypu, kolorObszaru } from "./render.js";
 import { nowyAtom, poPostawieniu, mozna, poRozbiorce, bezAtomu, obrocony, obrot, Historia } from "./edycja.js";
 import { autolacz, laczySie } from "./polaczenia.js";
 import { initSamouczek, zdarzenie, pokazSamouczek } from "./samouczek.js";
-import { zrodlo, ustawZrodlo, ZrodloFolder, ZrodloPliki, ZrodloSerwer } from "./zrodlo.js";
+import { zrodlo, ustawZrodlo, ZrodloFolder, ZrodloPliki, ZrodloSerwer, ZrodloGithub } from "./zrodlo.js";
+import { ustawRegulySciany, jestScienny, przyciagnij, atomNaScianie } from "./sciana.js";
 
 const $ = (s) => document.querySelector(s);
 const plotno = $("#plotno");
@@ -260,7 +261,7 @@ function pokazPrzyciski() {
 }
 
 function wybierzProjekt(typ) {
-  stan.narzedzie = { rodzaj: "buduj", typ, tryb: trybTypu(typ) };
+  stan.narzedzie = { rodzaj: "buduj", typ, tryb: trybTypu(typ), scienny: jestScienny(typ) };
   if (typ.startsWith("/turf/closed")) stan.ostatnie.sciana = typ;
   else if (typ.startsWith("/turf/open/floor")) stan.ostatnie.podloga = typ;
   const domyslny = zmienne(typ).dir | 0 || 2;
@@ -370,6 +371,15 @@ function ustawZmiany(v) {
   $("#b-zapisz").classList.toggle("zmiany", v);
 }
 
+// Po zapisie w trybie GitHub: plik się pobrał, teraz trzeba go wgrać (GitHub sam zrobi fork i PR).
+function pokazWgranie(plik) {
+  $("#wgranie-plik").textContent = plik.split("/").pop();
+  $("#wgranie-sciezka").textContent = plik;
+  $("#wgranie-link").href = zrodlo.linkWgrania(plik);
+  $("#okno-wgranie").classList.remove("ukryty");
+}
+$("#wgranie-zamknij").onclick = () => $("#okno-wgranie").classList.add("ukryty");
+
 async function zapisz() {
   if (!stan.mapa) return;
   ladowanie("Zapisuję…");
@@ -377,7 +387,8 @@ async function zapisz() {
     const tekst = stan.mapa.zapisz();
     const jak = await zrodlo.zapisz(stan.mapa.plik, tekst);
     ustawZmiany(false);
-    if (jak === "pobrano") komunikat(`Pobrano ${stan.mapa.plik.split("/").pop()} – podmień nim plik ${stan.mapa.plik} w repo (ta przeglądarka nie zapisuje prosto na dysk).`);
+    if (jak === "github") pokazWgranie(stan.mapa.plik);
+    else if (jak === "pobrano") komunikat(`Pobrano ${stan.mapa.plik.split("/").pop()} – podmień nim plik ${stan.mapa.plik} w repo (ta przeglądarka nie zapisuje prosto na dysk).`);
     else komunikat("Zapisano " + stan.mapa.plik);
     zdarzenie("zapisz");
   } catch (e) {
@@ -483,6 +494,14 @@ function projekt() {
     });
   }
   if (!n || n.rodzaj !== "buduj") return pola;
+  if (n.scienny) {
+    // jeden obiekt na klik, przyciągnięty do ściany najbliższej kursorowi
+    const k = stan.przeciaganie ? stan.przeciaganie.start : stan.kursor;
+    const u = stan.przeciaganie?.ulamek || stan.ulamek || { fx: 0.5, fy: 0.5 };
+    const s = przyciagnij(stan.mapa, widok.z, k, u.fx, u.fy);
+    if (!s) return stan.mapa.wewnatrz(k.x, k.y) ? [{ ...k, atom: nowyAtom(n.typ, stan.kierunek), bezSciany: true }] : [];
+    return [{ x: s.x, y: s.y, atom: atomNaScianie(n.typ, s.d) }];
+  }
   if (laczySie(n.typ) && (n.tryb === "linia" || !stan.przeciaganie)) {
     const atomy = autolacz(stan.mapa, widok.z, pola, n.typ, stan.kierunek);
     return pola.map((p, i) => ({ ...p, atom: atomy[i] }));
@@ -612,7 +631,7 @@ function wykonaj() {
   const ile = historia.biezaca?.size || 0;
   if (ile) ustawZmiany(true);
   historia.zakoncz();
-  if (ile) zdarzenie(calkiem ? "wyczysc" : n.rodzaj, { typ: n.typ, ile, kierunek: stan.kierunek });
+  if (ile) zdarzenie(calkiem ? "wyczysc" : n.rodzaj, { typ: n.typ, ile, kierunek: stan.kierunek, scienny: n.scienny });
   pokazInspekcje();
   widok.rysuj();
 }
@@ -847,7 +866,8 @@ function pokazPodpowiedz(e) {
   else if (n.rodzaj === "pokoj") tekst = `Pokój – ${ladnaNazwa(stan.ostatnie.sciana)} + ${ladnaNazwa(stan.ostatnie.podloga)} (ostatnio wybrane w Architekcie)`;
   else {
     const kier = { 1: "północ", 2: "południe", 4: "wschód", 8: "zachód", 5: "pn-wsch", 6: "pd-wsch", 9: "pn-zach", 10: "pd-zach" }[stan.kierunek] || stan.kierunek;
-    const obrot = korzen(n.typ) === "obj" || korzen(n.typ) === "mob" ? ` · kierunek: ${kier}` : "";
+    const obrot = n.scienny ? (projekt()[0]?.bezSciany ? " · brak ściany obok" : " · przyciąga się do ściany")
+      : korzen(n.typ) === "obj" || korzen(n.typ) === "mob" ? ` · kierunek: ${kier}` : "";
     const tryb = { obrys: "przeciągnij: obrys", prostokat: "przeciągnij: wypełnij", linia: "przeciągnij: linia", pojedynczo: "klik lub malowanie" }[n.tryb];
     tekst = `${ladnaNazwa(n.typ)}${obrot} · ${tryb}`;
   }
@@ -887,7 +907,7 @@ plotno.addEventListener("mousedown", (e) => {
     return;
   }
   stan.kursor = kaf;
-  stan.przeciaganie = { start: kaf, pola: new Map([[kluczPola(kaf.x, kaf.y), kaf]]), shift: e.shiftKey };
+  stan.przeciaganie = { start: kaf, pola: new Map([[kluczPola(kaf.x, kaf.y), kaf]]), shift: e.shiftKey, ulamek: stan.ulamek };
   widok.rysuj();
 });
 
@@ -907,8 +927,14 @@ window.addEventListener("mousemove", (e) => {
   const kaf = widok.naKafelek(e.clientX - r.left, e.clientY - r.top);
   const zmiana = !stan.kursor || kaf.x !== stan.kursor.x || kaf.y !== stan.kursor.y;
   stan.kursor = kaf;
+  // położenie kursora w kafelku – do wyboru ściany przy obiektach ściennych
+  const kol = (e.clientX - r.left) / widok.kam.zoom + widok.kam.x, wr = (e.clientY - r.top) / widok.kam.zoom + widok.kam.y;
+  const ulamek = { fx: kol - Math.floor(kol), fy: 1 - (wr - Math.floor(wr)) };
+  const innaCwiartka = !stan.ulamek || (ulamek.fx > ulamek.fy) !== (stan.ulamek.fx > stan.ulamek.fy) || (ulamek.fx + ulamek.fy > 1) !== (stan.ulamek.fx + stan.ulamek.fy > 1);
+  stan.ulamek = ulamek;
   if (stan.przeciaganie && stan.narzedzie?.tryb === "pojedynczo" && stan.mapa.wewnatrz(kaf.x, kaf.y)) stan.przeciaganie.pola.set(kluczPola(kaf.x, kaf.y), kaf);
-  if (zmiana) { pokazInfo(); widok.rysuj(); }
+  if (zmiana) pokazInfo();
+  if (zmiana || (innaCwiartka && stan.narzedzie?.scienny)) widok.rysuj();
   pokazPodpowiedz(e);
 });
 
@@ -1061,6 +1087,14 @@ async function pokazStart(blad) {
   el.classList.remove("ukryty");
   $("#start-blad").textContent = blad || "";
   $("#start-blad").classList.toggle("ukryty", !blad);
+  const github = await ZrodloGithub.wykryj();
+  $("#start-github").classList.toggle("ukryty", !github);
+  $("#start-lub").classList.toggle("ukryty", !github);
+  if (github) {
+    $("#start-github-nazwa").textContent = github.info.repo;
+    $("#start-github-opis").textContent = `${github.info.map} map, stan z ${github.info.data} (commit ${github.info.sha.slice(0, 7)})`;
+    $("#start-github").onclick = () => uruchom(github);
+  }
   const mozeFolder = ZrodloFolder.dostepne();
   $("#start-folder").classList.toggle("ukryty", !mozeFolder);
   $("#start-bez-zapisu").classList.toggle("ukryty", mozeFolder);
@@ -1089,6 +1123,7 @@ async function uruchom(z) {
     listaMap = mapy;
     stan.kategorie = [...kat.kategorie, { id: "szablony", nazwa: "Szablony", ikona: "/obj/item/paper", reguly: [] }];
     stan.tryby = kat.tryby;
+    ustawRegulySciany(kat.naScianie, kat.naScianieWyklucz);
     zbudujKatalog();
     await wczytajSzablony();
     // Pokój domyślnie z najczęstszej ściany i podłogi na mapach.
