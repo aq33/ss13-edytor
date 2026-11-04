@@ -23,7 +23,8 @@ ZMIENNE = {
     "pixel_x", "pixel_y", "pixel_w", "pixel_z", "color", "alpha",
     "density", "opacity", "invisibility", "smooth", "canSmoothWith",
     "abstract_type", "parent_type", "base_icon_state", "smoothing_flags",
-    "smoothing_groups", "canSmoothWith",
+    "smoothing_groups", "legacy_smooth", "fulltile", "anchored",
+    "texture", "texture_state",
 }
 
 KORZENIE = ("/area", "/turf", "/obj", "/mob")

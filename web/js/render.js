@@ -3,6 +3,7 @@
 
 import { ikonaGotowa, klatka, poWczytaniu } from "./dmi.js";
 import { zmienneAtomu, korzen } from "./typy.js";
+import { wygladz } from "./wygladzanie.js";
 
 const KAWALEK = 16;
 const MARGINES = 2;          // kafelki z sąsiedztwa, których grafika może wejść na kawałek
@@ -53,12 +54,12 @@ export function elementAtomu(atom, brak) {
   if (!ik) return null;
   if (!ik.obraz.__id) ik.obraz.__id = ++licznikObrazow;
   const kl = klatka(ik, v.icon_state, v.dir | 0);
-  if (!kl) return null;
-  return { kl, v };
+  return { kl, v, ik };
 }
 
 function rysujElement(g, el, px, py, skala, alfa = 1) {
   const { kl, v } = el;
+  if (!kl) return;
   const dx = px + ((v.pixel_x | 0) + (v.pixel_w | 0)) * skala;
   const dy = py + (32 - kl.h - (v.pixel_y | 0) - (v.pixel_z | 0)) * skala;
   const a = (v.alpha ?? 255) / 255 * alfa;
@@ -192,8 +193,19 @@ export class Widok {
           el.kol = kol; el.wr = wr;
           el.plane = el.v.plane | 0;
           el.layer = +el.v.layer || 0;
-          el.kolejnosc = (wr * 100000 + kol) * 16 + (atomy.length - i);
-          elementy.push(el);
+          el.kolejnosc = (wr * 100000 + kol) * 256 + (atomy.length - i) * 16;
+          const wyg = wygladz(m, x, y, this.z, a, el.v);
+          if (wyg) {
+            if (wyg.bazowy === null) el.kl = null;
+            else if (wyg.bazowy !== el.v.icon_state) el.kl = klatka(el.ik, wyg.bazowy, el.v.dir | 0);
+            if (el.kl) elementy.push(el);
+            wyg.nakladki.forEach((n, j) => {
+              const kl = klatka(el.ik, n.stan, n.dir, true);
+              if (kl) elementy.push({ ...el, kl, kolejnosc: el.kolejnosc + 1 + j });
+            });
+            continue;
+          }
+          if (el.kl) elementy.push(el);
         }
       }
     }
@@ -241,7 +253,7 @@ export class Widok {
   // Do nakładek: rysuje atom w kafelku (podgląd przed postawieniem).
   rysujAtom(g, atom, x, y, alfa = 0.6) {
     const el = elementAtomu(atom);
-    if (!el) return false;
+    if (!el || !el.kl) return false;
     const p = this.naEkran(x, y);
     rysujElement(g, el, p.sx, p.sy, this.kam.zoom / 32, alfa);
     return true;
@@ -253,7 +265,7 @@ export function ikonkaTypu(canvas, atom) {
   const g = canvas.getContext("2d");
   g.imageSmoothingEnabled = false;
   const el = elementAtomu(atom);
-  if (!el) return false;
+  if (!el || !el.kl) return false;
   g.clearRect(0, 0, canvas.width, canvas.height);
   const { kl } = el;
   const s = Math.min(canvas.width / kl.w, canvas.height / kl.h);

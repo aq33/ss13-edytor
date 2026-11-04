@@ -31,6 +31,19 @@ export function rodzic(sciezka) {
   return i > 0 ? sciezka.slice(0, i) : null;
 }
 
+// istype(): czy typ to baza albo jej podtyp.
+const przodkowie = new Map();
+export function jestTypu(typ, baza) {
+  if (typ === baza) return true;
+  let zbior = przodkowie.get(typ);
+  if (!zbior) {
+    zbior = new Set();
+    for (let r = rodzic(typ); r; r = rodzic(r)) zbior.add(r);
+    przodkowie.set(typ, zbior);
+  }
+  return zbior.has(baza);
+}
+
 export function korzen(sciezka) {
   const m = sciezka.match(/^\/(area|turf|obj|mob)/);
   return m ? m[1] : null;
@@ -40,6 +53,7 @@ function prosta(v) {
   if (v && typeof v === "object") {
     if ("plik" in v) return v.plik;
     if ("typ" in v) return v.typ;
+    if ("lista" in v) return v.lista.filter((x) => x.startsWith("/"));
     return undefined; // wyrażenie, którego ekstraktor nie wyliczył
   }
   return v;

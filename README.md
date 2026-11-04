@@ -29,8 +29,12 @@ Przy pierwszym starcie i po zmianie plików `.dm` czyta kod (ok. 8 s). Wynik trz
 | Postaw | LPM, przeciąganie zależy od rodzaju: ściany = obrys, podłogi i obszary = wypełnienie, kable/rury/okna = linia, meble = malowanie |
 | Anuluj narzędzie | PPM albo `Esc` |
 | Obrót | `Q` / `E` |
+| Kable i rury | przeciąganie linii samo łączy segmenty: zakręty, końcówki i doczepianie do istniejących instalacji obok |
+| Pokój | `R`: ściany dookoła, podłoga w środku (ostatnio wybrana ściana i podłoga z Architekta) |
 | Rozbiórka | przycisk albo `X`; usuwa obiekty, ściany zamienia na poszycie |
-| Inspekcja kafelka | bez narzędzia klik na kafelek: lista atomów z obracaniem i usuwaniem |
+| Kopiuj / wklej | `C` zaznacza prostokąt, potem klik wkleja (kursor = lewy górny róg); `V` wraca do wklejania |
+| Szablony | „Zapisz jako szablon” zapisuje schowek do `szablony/`; wklejasz je z kategorii **Szablony** w Architekcie |
+| Inspekcja kafelka | bez narzędzia klik na kafelek: lista atomów z obracaniem, usuwaniem, pipetą (⧉) i edycją zmiennych (✎) |
 | Przesuwanie widoku | `WASD`, strzałki, środkowy albo prawy przycisk z przeciągnięciem |
 | Przybliżanie | kółko myszy |
 | Poziom Z | `PageUp` / `PageDown` |
@@ -45,8 +49,15 @@ Przy pierwszym starcie i po zmianie plików `.dm` czyta kod (ok. 8 s). Wynik trz
 - `web/js/`: `dmi.js` (ikony), `dmm.js` (odczyt i zapis map), `typy.js` (dziedziczenie zmiennych),
   `render.js` (rysowanie), `edycja.js` (operacje i historia), `main.js` (interfejs).
 
-## Czego jeszcze nie ma
+## Wygładzanie
 
-- Wygładzania ścian, okien i stołów: rysują się w stanie bazowym z kodu.
-- Edycji zmiennych (poza kierunkiem), kopiowania obszarów i szablonów pokojów.
-- Automatycznego łączenia kabli i rur przy przeciąganiu: stawia się wybrany stan ikony.
+`web/js/wygladzanie.js` liczy połączenia tak jak gra:
+- `legacy_smooth` (Bay, `nsv13/code/game/turfs/legacy_smooth.dm`): ściany, fałszywe ściany, okna fulltile, kraty;
+- stary system tg (`code/__HELPERS/icon_smoothing.dm`): stoły, dywany itp., także wariant diagonalny.
+
+## Ograniczenia
+
+- Podgląd przed postawieniem nie wygładza się z sąsiadami. Robi to dopiero postawiony obiekt.
+- Wklejanie nie obraca fragmentu. Obszary (`/area`) zostają te z celu.
+- Autołączenie nie robi rozgałęzień (manifoldów). Stawia się je ręcznie z kategorii Rury i atmos.
+- 9 z 733 map w repo nie wraca bajt w bajt. Zapis usuwa nieużywane klucze (tak samo robi mapmerge) i ujednolica ręczne odstępstwa od formatu TGM.

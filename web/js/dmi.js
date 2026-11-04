@@ -99,10 +99,10 @@ export function ikonaGotowa(sciezka) {
 }
 
 // Zwraca wycinek obrazka dla stanu i kierunku albo null.
-export function klatka(ik, stan, kierunek = 2) {
+export function klatka(ik, stan, kierunek = 2, scisle = false) {
   if (!ik) return null;
   let s = ik.stany.get(stan ?? "");
-  if (!s) s = ik.stany.get("");
+  if (!s && !scisle) s = ik.stany.get("");
   if (!s) return null;
   let k = 0;
   if (s.kierunki === 4 || s.kierunki === 8) {

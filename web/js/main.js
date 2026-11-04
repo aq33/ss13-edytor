@@ -3,6 +3,7 @@ import { ikona } from "./dmi.js";
 import { wczytajTypy, wszystkie, zmienne, ileUzyc, korzen, zmienneAtomu } from "./typy.js";
 import { Widok, ikonkaTypu, kolorObszaru } from "./render.js";
 import { nowyAtom, poPostawieniu, mozna, poRozbiorce, bezAtomu, obrocony, obrot, Historia } from "./edycja.js";
+import { autolacz, laczySie } from "./polaczenia.js";
 
 const $ = (s) => document.querySelector(s);
 const plotno = $("#plotno");
@@ -23,6 +24,10 @@ const stan = {
   katalog: new Map(),       // id kategorii -> [typy]
   kategoria: null,
   podgrupa: null,
+  schowek: null,            // { szer, wys, kafelki: [{ dx, dy, atomy }] }
+  szablony: [],
+  edycjaZm: null,           // indeks atomu z otwartym formularzem zmiennych
+  ostatnie: { sciana: "/turf/closed/wall", podloga: "/turf/open/floor/plating" }, // do narzędzia Pokój
 };
 
 // ---------------------------------------------------------------- komunikaty
@@ -42,7 +47,8 @@ function ladowanie(tekst) {
 
 const ladnaNazwa = (typ) => {
   const n = zmienne(typ).name;
-  const s = n && typeof n === "string" && !n.includes("[") ? n : typ.split("/").pop().replace(/_/g, " ");
+  const czysta = typeof n === "string" ? n.replace(/\\(im)?proper\s*/g, "").trim() : "";
+  const s = czysta && !czysta.includes("[") ? czysta : typ.split("/").pop().replace(/_/g, " ");
   return s.charAt(0).toUpperCase() + s.slice(1);
 };
 
@@ -115,10 +121,91 @@ function podgrupaTypu(typ, kat) {
   return reszta[0] || regula.split("/").pop();
 }
 
+// ---------------------------------------------------------------- szablony
+
+async function wczytajSzablony() {
+  try { stan.szablony = await fetch("/api/szablony").then((r) => r.json()); } catch { stan.szablony = []; }
+}
+
+// Miniatura fragmentu mapy (szablonu) na canvasie.
+async function rysujMiniature(canvas, s) {
+  const pliki = new Set();
+  for (const t of s.kafelki) for (const a of t.atomy) { const i = zmienneAtomu(a).icon; if (i) pliki.add(i); }
+  await Promise.all([...pliki].map((p) => ikona(p)));
+  const g = canvas.getContext("2d");
+  g.imageSmoothingEnabled = false;
+  const bok = Math.min(canvas.width / s.szer, canvas.height / s.wys);
+  const ox = (canvas.width - bok * s.szer) / 2, oy = (canvas.height - bok * s.wys) / 2;
+  const tymczasowy = document.createElement("canvas");
+  tymczasowy.width = tymczasowy.height = 32;
+  for (const t of s.kafelki) {
+    const kolejne = t.atomy.filter((a) => !a.typ.startsWith("/area")).sort((a, b) => (+zmienneAtomu(a).layer || 0) - (+zmienneAtomu(b).layer || 0));
+    for (const a of kolejne) {
+      if (!ikonkaTypu(tymczasowy, a, false)) continue;
+      g.drawImage(tymczasowy, ox + t.dx * bok, oy + (s.wys - 1 - t.dy) * bok, bok, bok);
+    }
+  }
+}
+
+function pokazSzablony() {
+  const el = $("#przyciski");
+  $("#podgrupy").innerHTML = "";
+  el.innerHTML = "";
+  const fraza = $("#szukaj").value.trim().toLowerCase();
+  const lista = stan.szablony.filter((s) => s.nazwa.toLowerCase().includes(fraza));
+  if (!lista.length) {
+    el.innerHTML = `<div class="pusto">Brak szablonów. Skopiuj fragment mapy (C), a potem kliknij „Zapisz jako szablon” na dole.</div>`;
+    return;
+  }
+  for (const s of lista) {
+    const b = document.createElement("div");
+    b.className = "projekt";
+    if (stan.narzedzie?.rodzaj === "wklej" && stan.narzedzie.nazwa === s.nazwa) b.classList.add("wlaczony");
+    const c = document.createElement("canvas");
+    c.width = c.height = 64;
+    const n = document.createElement("span");
+    n.textContent = `${s.nazwa} (${s.szer}×${s.wys})`;
+    const x = document.createElement("button");
+    x.className = "usun-szablon";
+    x.textContent = "✕";
+    x.title = "Usuń szablon";
+    x.onclick = async (e) => {
+      e.stopPropagation();
+      if (!confirm(`Usunąć szablon „${s.nazwa}”?`)) return;
+      await fetch("/api/szablon?plik=" + encodeURIComponent(s.plik), { method: "DELETE" });
+      await wczytajSzablony();
+      pokazSzablony();
+    };
+    b.title = s.nazwa;
+    b.append(c, n, x);
+    b.onclick = () => {
+      stan.narzedzie = { rodzaj: "wklej", schowek: s, nazwa: s.nazwa };
+      odswiezPrzyciskiNarzedzi();
+      pokazSzablony();
+    };
+    rysujMiniature(c, s);
+    el.append(b);
+  }
+}
+
+async function zapiszSzablon() {
+  const s = stan.schowek;
+  if (!s) return;
+  const nazwa = prompt("Nazwa szablonu:", "Pokój");
+  if (!nazwa) return;
+  const plik = nazwa.trim().replace(/[^\w\-ąćęłńóśźżĄĆĘŁŃÓŚŹŻ ]/g, "_").slice(0, 80) + ".json";
+  const odp = await fetch("/api/szablon?plik=" + encodeURIComponent(plik), { method: "POST", body: JSON.stringify({ nazwa: nazwa.trim(), szer: s.szer, wys: s.wys, kafelki: s.kafelki }) });
+  if (!odp.ok) { komunikat("Nie zapisano szablonu: " + ((await odp.json()).blad || odp.status), true); return; }
+  await wczytajSzablony();
+  komunikat(`Zapisano szablon „${nazwa}”`);
+  if (stan.kategoria === "szablony") pokazSzablony();
+}
+
 function pokazPrzyciski() {
   const kat = stan.kategorie.find((k) => k.id === stan.kategoria);
   if (!kat) return;
   $("#kat-nazwa").textContent = kat.nazwa;
+  if (kat.id === "szablony") { pokazSzablony(); return; }
   const fraza = $("#szukaj").value.trim().toLowerCase();
   const wszystkieTypy = $("#wszystkie").checked;
   let lista = stan.katalog.get(kat.id) || [];
@@ -170,6 +257,8 @@ function pokazPrzyciski() {
 
 function wybierzProjekt(typ) {
   stan.narzedzie = { rodzaj: "buduj", typ, tryb: trybTypu(typ) };
+  if (typ.startsWith("/turf/closed")) stan.ostatnie.sciana = typ;
+  else if (typ.startsWith("/turf/open/floor")) stan.ostatnie.podloga = typ;
   const domyslny = zmienne(typ).dir | 0 || 2;
   stan.kierunek = domyslny;
   for (const b of document.querySelectorAll(".projekt")) b.classList.toggle("wlaczony", b.querySelector("span").textContent === ladnaNazwa(typ) && b.title.includes("\n" + typ + "\n"));
@@ -189,6 +278,9 @@ function anulujNarzedzie() {
 function odswiezPrzyciskiNarzedzi() {
   const n = stan.narzedzie;
   $("#b-rozbiorka").classList.toggle("wlaczony", n?.rodzaj === "rozbiorka");
+  $("#b-pokoj").classList.toggle("wlaczony", n?.rodzaj === "pokoj");
+  $("#b-kopiuj").classList.toggle("wlaczony", n?.rodzaj === "kopiuj");
+  $("#b-wklej").classList.toggle("wlaczony", n?.rodzaj === "wklej");
   $("#b-wskaz").classList.toggle("wlaczony", !n);
   $("#b-architekt").classList.toggle("wlaczony", !$("#architekt").classList.contains("ukryty"));
   plotno.style.cursor = n ? "crosshair" : "default";
@@ -359,23 +451,96 @@ function polaPrzeciagniecia(start, kon, tryb) {
 function biezacePola() {
   const n = stan.narzedzie;
   if (!stan.mapa || !stan.kursor) return [];
-  const tryb = n?.rodzaj === "rozbiorka" ? "prostokat" : n?.tryb;
+  const tryb = n?.rodzaj === "buduj" ? n.tryb : "prostokat";
   const p = stan.przeciaganie;
   if (!p) return stan.mapa.wewnatrz(stan.kursor.x, stan.kursor.y) ? [stan.kursor] : [];
   if (tryb === "pojedynczo") return [...p.pola.values()];
   return polaPrzeciagniecia(p.start, stan.kursor, tryb);
 }
 
+// Co dokładnie stanie na których polach (z autołączeniem kabli i rur).
+function projekt() {
+  const n = stan.narzedzie;
+  if (n?.rodzaj === "wklej") return polaWklejania(n.schowek);
+  const pola = biezacePola();
+  if (n?.rodzaj === "pokoj") {
+    const p = stan.przeciaganie;
+    const s0 = p ? p.start : stan.kursor;
+    const x0 = Math.min(s0.x, stan.kursor.x), x1 = Math.max(s0.x, stan.kursor.x);
+    const y0 = Math.min(s0.y, stan.kursor.y), y1 = Math.max(s0.y, stan.kursor.y);
+    return pola.map((q) => {
+      const brzeg = q.x === x0 || q.x === x1 || q.y === y0 || q.y === y1;
+      return { ...q, atom: nowyAtom(brzeg ? stan.ostatnie.sciana : stan.ostatnie.podloga, 2) };
+    });
+  }
+  if (!n || n.rodzaj !== "buduj") return pola;
+  if (laczySie(n.typ) && (n.tryb === "linia" || !stan.przeciaganie)) {
+    const atomy = autolacz(stan.mapa, widok.z, pola, n.typ, stan.kierunek);
+    return pola.map((p, i) => ({ ...p, atom: atomy[i] }));
+  }
+  return pola.map((p) => ({ ...p, atom: nowyAtom(n.typ, stan.kierunek) }));
+}
+
+// ---------------------------------------------------------------- schowek
+
+const jestObszarem = (a) => a.typ.startsWith("/area");
+// Kafelek z samym kosmosem nie nadpisuje celu – kształt pokoju wkleja się czysto.
+const pustyKosmos = (atomy) => atomy.every((a) => jestObszarem(a) || a.typ.startsWith("/turf/open/space"));
+
+function kopiuj(pola) {
+  if (!pola.length) return null;
+  const x0 = Math.min(...pola.map((p) => p.x)), y0 = Math.min(...pola.map((p) => p.y));
+  const x1 = Math.max(...pola.map((p) => p.x)), y1 = Math.max(...pola.map((p) => p.y));
+  const kafelki = [];
+  for (const { x, y } of pola) {
+    const atomy = stan.mapa.atomy(x, y, widok.z);
+    if (!atomy.length || pustyKosmos(atomy)) continue;
+    kafelki.push({ dx: x - x0, dy: y - y0, atomy: atomy.map((a) => ({ typ: a.typ, zm: a.zm.map((e) => [...e]) })) });
+  }
+  return { szer: x1 - x0 + 1, wys: y1 - y0 + 1, kafelki };
+}
+
+function polaWklejania(schowek) {
+  const k = stan.kursor;
+  if (!k || !schowek) return [];
+  // kursor = lewy górny róg wklejanego fragmentu
+  return schowek.kafelki
+    .map((t) => ({ x: k.x + t.dx, y: k.y - (schowek.wys - 1) + t.dy, atomy: t.atomy }))
+    .filter((p) => stan.mapa.wewnatrz(p.x, p.y));
+}
+
+function ustawSchowek(s) {
+  stan.schowek = s;
+  $("#b-wklej").disabled = !s;
+  $("#b-zapisz-szablon").disabled = !s;
+}
+
+function wklejNa(atomyCelu, atomySchowka) {
+  const obszarCelu = atomyCelu.find(jestObszarem);
+  const reszta = atomySchowka.filter((a) => !jestObszarem(a));
+  const obszar = obszarCelu || atomySchowka.find(jestObszarem);
+  return obszar ? [...reszta, obszar] : reszta;
+}
+
 function wykonaj() {
   const n = stan.narzedzie;
-  const pola = biezacePola();
+  const pola = projekt();
+  if (n.rodzaj === "kopiuj") {
+    const s = kopiuj(pola);
+    if (!s || !s.kafelki.length) { komunikat("Nic do skopiowania"); return; }
+    ustawSchowek(s);
+    stan.narzedzie = { rodzaj: "wklej", schowek: s };
+    odswiezPrzyciskiNarzedzi();
+    komunikat(`Skopiowano ${s.szer}×${s.wys}. Kliknij, żeby wkleić (PPM kończy).`);
+    return;
+  }
   historia.zacznij();
-  for (const { x, y } of pola) {
+  for (const { x, y, atom, atomy: wklejane } of pola) {
     const atomy = stan.mapa.atomy(x, y, widok.z);
     let nowe = null;
     if (n.rodzaj === "rozbiorka") nowe = poRozbiorce(atomy);
+    else if (n.rodzaj === "wklej") nowe = wklejNa(atomy, wklejane);
     else {
-      const atom = nowyAtom(n.typ, stan.kierunek);
       if (!mozna(atomy, atom)) continue;
       nowe = poPostawieniu(atomy, atom);
     }
@@ -411,7 +576,7 @@ widok.nakladki.push((g, w) => {
     g.strokeRect(p.sx + 1, p.sy + 1, z - 2, z - 2);
   }
   const n = stan.narzedzie;
-  const pola = biezacePola();
+  const pola = projekt();
   if (!n) {
     if (stan.kursor && m.wewnatrz(stan.kursor.x, stan.kursor.y)) {
       const p = w.naEkran(stan.kursor.x, stan.kursor.y);
@@ -421,16 +586,22 @@ widok.nakladki.push((g, w) => {
     }
     return;
   }
-  for (const { x, y } of pola) {
+  for (const { x, y, atom, atomy: wklejane } of pola) {
     const p = w.naEkran(x, y);
-    if (n.rodzaj === "rozbiorka") {
-      g.fillStyle = "rgba(192,69,58,0.35)";
+    if (n.rodzaj === "rozbiorka" || n.rodzaj === "kopiuj") {
+      g.fillStyle = n.rodzaj === "kopiuj" ? "rgba(80,140,220,0.3)" : "rgba(192,69,58,0.35)";
       g.fillRect(p.sx, p.sy, z, z);
       continue;
     }
-    const atom = nowyAtom(n.typ, stan.kierunek);
+    if (n.rodzaj === "wklej") {
+      const kolejne = [...wklejane].filter((a) => !jestObszarem(a)).sort((a, b) => (+zmienneAtomu(a).layer || 0) - (+zmienneAtomu(b).layer || 0));
+      for (const a of kolejne) w.rysujAtom(g, a, x, y, 0.7);
+      g.fillStyle = "rgba(80,140,220,0.15)";
+      g.fillRect(p.sx, p.sy, z, z);
+      continue;
+    }
     const ok = mozna(m.atomy(x, y, w.z), atom);
-    if (n.typ.startsWith("/area")) {
+    if (atom.typ.startsWith("/area")) {
       g.fillStyle = kolorObszaru(n.typ).replace("0.28", "0.45");
       g.fillRect(p.sx, p.sy, z, z);
     } else {
@@ -496,10 +667,95 @@ function pokazInspekcje() {
       przycisk("⟲", "Obróć w lewo", () => zmien(obrocony(atomy, i, -1)));
       przycisk("⟳", "Obróć w prawo", () => zmien(obrocony(atomy, i, 1)));
     }
+    przycisk("⧉", "Buduj tym (pipeta)", () => { wybierzProjekt(a.typ); if (rk !== "area" && rk !== "turf") stan.kierunek = kierunekZAtomu(a); });
+    if (rk !== "area") przycisk("✎", "Edytuj zmienne", () => { stan.edycjaZm = stan.edycjaZm === i ? null : i; pokazInspekcje(); });
     if (rk !== "area") przycisk("✕", rk === "turf" ? "Zamień na poszycie" : "Usuń", () => zmien(bezAtomu(atomy, i)));
     el.append(r);
+    if (stan.edycjaZm === i) el.append(formularzZmiennych(a, (zm) => {
+      stan.edycjaZm = null;
+      zmien(atomy.map((x, k) => (k === i ? { typ: a.typ, zm } : x)));
+    }));
   });
   el.classList.remove("ukryty");
+}
+
+const kierunekZAtomu = (a) => +(a.zm.find(([k]) => k === "dir")?.[1] ?? (zmienne(a.typ).dir | 0 || 2));
+
+// Zmienne tekstowe, które same dostają cudzysłowy, jeśli ktoś ich nie wpisze.
+const TEKSTOWE = new Set(["name", "desc", "icon_state", "id", "id_tag", "req_access_txt", "req_one_access_txt", "base_icon_state", "tag", "dname"]);
+const KIERUNKI = [[2, "południe"], [1, "północ"], [4, "wschód"], [8, "zachód"], [6, "pd-wsch"], [10, "pd-zach"], [5, "pn-wsch"], [9, "pn-zach"]];
+
+function formularzZmiennych(atom, zastosuj) {
+  const f = document.createElement("div");
+  f.className = "formularz";
+  const wiersze = document.createElement("div");
+  const domyslne = zmienne(atom.typ);
+  const dodajWiersz = (k = "", v = "") => {
+    const w = document.createElement("div");
+    w.className = "zmienna";
+    w.innerHTML = `<input class="nazwa" placeholder="zmienna" spellcheck="false"><input class="wartosc" placeholder="wartość" spellcheck="false"><button title="Usuń">✕</button>`;
+    const [n, wart, x] = w.children;
+    n.value = k; wart.value = v;
+    const podpowiedz = () => { const d = domyslne[n.value]; wart.placeholder = d === undefined || d === null ? "wartość" : "domyślnie: " + (typeof d === "object" ? JSON.stringify(d) : d); };
+    n.oninput = podpowiedz; podpowiedz();
+    x.onclick = () => w.remove();
+    wiersze.append(w);
+    return w;
+  };
+  for (const [k, v] of atom.zm) dodajWiersz(k, v);
+  const ustaw = (k, v) => {
+    const jest = [...wiersze.children].find((w) => w.children[0].value.trim() === k);
+    (jest || dodajWiersz(k)).children[1].value = v;
+  };
+
+  const szybkie = document.createElement("div");
+  szybkie.className = "szybkie";
+  const rk = korzen(atom.typ);
+  if (rk === "obj" || rk === "mob") {
+    const sel = document.createElement("select");
+    sel.innerHTML = `<option value="">kierunek…</option>` + KIERUNKI.map(([d, n]) => `<option value="${d}">${n} (${d})</option>`).join("");
+    sel.onchange = () => { if (sel.value) ustaw("dir", sel.value); sel.value = ""; };
+    szybkie.append(sel);
+  }
+  const v = zmienneAtomu(atom);
+  if (v.icon) {
+    const sel = document.createElement("select");
+    sel.innerHTML = `<option value="">stan ikony…</option>`;
+    ikona(v.icon).then((ik) => {
+      if (!ik) return;
+      for (const nazwa of ik.stany.keys()) { const o = document.createElement("option"); o.value = o.textContent = nazwa || "(pusty)"; if (!nazwa) o.value = "__pusty__"; sel.append(o); }
+    });
+    sel.onchange = () => { if (sel.value) ustaw("icon_state", JSON.stringify(sel.value === "__pusty__" ? "" : sel.value)); sel.value = ""; };
+    szybkie.append(sel);
+  }
+  const plus = document.createElement("button");
+  plus.textContent = "+ zmienna";
+  plus.onclick = () => dodajWiersz().children[0].focus();
+  szybkie.append(plus);
+
+  const dol = document.createElement("div");
+  dol.className = "szybkie";
+  const ok = document.createElement("button");
+  ok.textContent = "Zastosuj";
+  ok.className = "wlaczony";
+  ok.onclick = () => {
+    const zm = [];
+    for (const w of wiersze.children) {
+      const k = w.children[0].value.trim();
+      let val = w.children[1].value.trim();
+      if (!/^[A-Za-z_]\w*$/.test(k) || val === "") continue;
+      if (TEKSTOWE.has(k) && !/^["'{]/.test(val) && val !== "null") val = JSON.stringify(val);
+      zm.push([k, val]);
+    }
+    zm.sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+    zastosuj(zm);
+  };
+  const anuluj = document.createElement("button");
+  anuluj.textContent = "Anuluj";
+  anuluj.onclick = () => { stan.edycjaZm = null; pokazInspekcje(); };
+  dol.append(ok, anuluj);
+  f.append(wiersze, szybkie, dol);
+  return f;
 }
 
 function pokazPodpowiedz(e) {
@@ -508,6 +764,9 @@ function pokazPodpowiedz(e) {
   if (!n || !e) { el.classList.add("ukryty"); return; }
   let tekst;
   if (n.rodzaj === "rozbiorka") tekst = "Rozbiórka – przeciągnij, żeby usunąć obiekty (ściany zostają poszyciem)";
+  else if (n.rodzaj === "kopiuj") tekst = "Kopiuj – zaznacz prostokąt";
+  else if (n.rodzaj === "wklej") tekst = `Wklej ${n.schowek.szer}×${n.schowek.wys}${n.nazwa ? " „" + n.nazwa + "”" : ""} – kursor to lewy górny róg`;
+  else if (n.rodzaj === "pokoj") tekst = `Pokój – ${ladnaNazwa(stan.ostatnie.sciana)} + ${ladnaNazwa(stan.ostatnie.podloga)} (ostatnio wybrane w Architekcie)`;
   else {
     const kier = { 1: "północ", 2: "południe", 4: "wschód", 8: "zachód", 5: "pn-wsch", 6: "pd-wsch", 9: "pn-zach", 10: "pd-zach" }[stan.kierunek] || stan.kierunek;
     const obrot = korzen(n.typ) === "obj" || korzen(n.typ) === "mob" ? ` · kierunek: ${kier}` : "";
@@ -544,6 +803,7 @@ plotno.addEventListener("mousedown", (e) => {
   if (e.button !== 0) return;
   if (!stan.narzedzie) {
     stan.wybrany = stan.mapa.wewnatrz(kaf.x, kaf.y) ? kaf : null;
+    stan.edycjaZm = null;
     pokazInspekcje();
     widok.rysuj();
     return;
@@ -645,6 +905,9 @@ window.addEventListener("keydown", (e) => {
   else if (k === "pagedown") ustawPoziom(widok.z - 1);
   else if (k === "b") przelaczArchitekta();
   else if (k === "x") ustawRozbiorke();
+  else if (k === "r") przelaczNarzedzie("pokoj");
+  else if (k === "c") przelaczNarzedzie("kopiuj");
+  else if (k === "v") ustawWklej();
   else if (k === "g") { stan.siatka = !stan.siatka; $("#w-siatka").checked = stan.siatka; widok.rysuj(); }
 });
 window.addEventListener("keyup", (e) => wcisniete.delete(e.key.toLowerCase()));
@@ -657,13 +920,19 @@ function przelaczArchitekta() {
   $("#architekt").classList.toggle("ukryty");
   odswiezPrzyciskiNarzedzi();
 }
-function ustawRozbiorke() {
-  if (stan.narzedzie?.rodzaj === "rozbiorka") anulujNarzedzie();
-  else { stan.narzedzie = { rodzaj: "rozbiorka" }; odswiezPrzyciskiNarzedzi(); }
+function przelaczNarzedzie(rodzaj, dodatki = {}) {
+  if (stan.narzedzie?.rodzaj === rodzaj) anulujNarzedzie();
+  else { stan.narzedzie = { rodzaj, ...dodatki }; odswiezPrzyciskiNarzedzi(); pokazPodpowiedz(ostatniaMysz); widok.rysuj(); }
 }
+const ustawRozbiorke = () => przelaczNarzedzie("rozbiorka");
+const ustawWklej = () => { if (stan.schowek) przelaczNarzedzie("wklej", { schowek: stan.schowek }); };
 
 $("#b-architekt").onclick = przelaczArchitekta;
 $("#b-rozbiorka").onclick = ustawRozbiorke;
+$("#b-pokoj").onclick = () => przelaczNarzedzie("pokoj");
+$("#b-kopiuj").onclick = () => przelaczNarzedzie("kopiuj");
+$("#b-wklej").onclick = ustawWklej;
+$("#b-zapisz-szablon").onclick = zapiszSzablon;
 $("#b-wskaz").onclick = anulujNarzedzie;
 $("#b-zapisz").onclick = zapisz;
 $("#b-cofnij").onclick = cofnij;
@@ -704,9 +973,15 @@ async function start() {
       wczytajTypy(),
     ]);
     listaMap = info.mapy;
-    stan.kategorie = kat.kategorie;
+    stan.kategorie = [...kat.kategorie, { id: "szablony", nazwa: "Szablony", ikona: "/obj/item/paper", reguly: [] }];
     stan.tryby = kat.tryby;
     zbudujKatalog();
+    await wczytajSzablony();
+    // Pokój domyślnie z najczęstszej ściany i podłogi na mapach.
+    const najczestszy = (id, prefiks) => (stan.katalog.get(id) || []).find((t) => t.startsWith(prefiks));
+    stan.ostatnie.sciana = najczestszy("sciany", "/turf/closed/wall") || stan.ostatnie.sciana;
+    stan.ostatnie.podloga = najczestszy("podlogi", "/turf/open/floor") || stan.ostatnie.podloga;
+    ustawSchowek(null);
     pokazKategorie();
     odswiezPrzyciskiNarzedzi();
     ladowanie(null);

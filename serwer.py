@@ -25,6 +25,7 @@ import ekstraktor
 TUTAJ = os.path.dirname(os.path.abspath(__file__))
 WEB = os.path.join(TUTAJ, "web")
 DANE = os.path.join(TUTAJ, "dane")
+SZABLONY = os.path.join(TUTAJ, "szablony")
 
 blokada_typow = threading.Lock()
 pamiec = {"typy": None, "klucz": None}
@@ -73,7 +74,8 @@ def typy_json(repo, wymus=False):
         dme = znajdz_dme(repo)
         nazwa = hashlib.sha1(os.path.abspath(repo).lower().encode()).hexdigest()[:10]
         plik = os.path.join(DANE, "typy-%s.json.gz" % nazwa)
-        odcisk = odcisk_kodu(repo)
+        # Zmiana ekstraktora też unieważnia zapisany katalog.
+        odcisk = max(odcisk_kodu(repo), os.path.getmtime(ekstraktor.__file__))
         if not wymus and pamiec["typy"] is not None and pamiec["klucz"] == odcisk:
             return pamiec["typy"]
         if not wymus and os.path.exists(plik) and os.path.getmtime(plik) >= odcisk:
@@ -138,6 +140,19 @@ class Obsluga(BaseHTTPRequestHandler):
         p = url.path
         if p == "/api/info":
             return self._json({"repo": self.repo, "dme": os.path.basename(znajdz_dme(self.repo)), "mapy": lista_map(self.repo)})
+        if p == "/api/szablony":
+            wynik = []
+            if os.path.isdir(SZABLONY):
+                for f in sorted(os.listdir(SZABLONY)):
+                    if f.endswith(".json"):
+                        try:
+                            with open(os.path.join(SZABLONY, f), encoding="utf-8") as h:
+                                d = json.load(h)
+                            d["plik"] = f
+                            wynik.append(d)
+                        except (OSError, ValueError):
+                            pass
+            return self._json(wynik)
         if p == "/api/typy":
             surowe = typy_json(self.repo, "odswiez" in parse_qs(url.query))
             return self._wyslij(200, surowe, naglowki={"Content-Encoding": "gzip"})
@@ -161,14 +176,45 @@ class Obsluga(BaseHTTPRequestHandler):
         with open(sciezka, "rb") as f:
             self._wyslij(200, f.read(), typ)
 
-    def do_POST(self):
-        url = urlparse(self.path)
-        if url.path != "/api/zapisz":
-            return self._wyslij(404, b"", "text/plain")
+    def _z_interfejsu(self):
         # Tylko z interfejsu na localhost – inne strony nie mogą zapisywać plików.
         pochodzenie = self.headers.get("Origin", "")
-        if pochodzenie and not re.match(r"^http://(127\.0\.0\.1|localhost)(:\d+)?$", pochodzenie):
+        return not pochodzenie or re.match(r"^http://(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$", pochodzenie)
+
+    def _szablon(self, metoda):
+        nazwa = parse_qs(urlparse(self.path).query).get("plik", [""])[0]
+        if not re.fullmatch(r"[\w\-ąćęłńóśźżĄĆĘŁŃÓŚŹŻ ]{1,80}\.json", nazwa):
+            return self._json({"blad": "zła nazwa szablonu"}, 400)
+        sciezka = os.path.join(SZABLONY, nazwa)
+        if metoda == "DELETE":
+            if os.path.exists(sciezka):
+                os.remove(sciezka)
+            return self._json({"ok": True})
+        dane = self.rfile.read(int(self.headers.get("Content-Length", "0")))
+        try:
+            json.loads(dane)
+        except ValueError:
+            return self._json({"blad": "to nie JSON"}, 400)
+        os.makedirs(SZABLONY, exist_ok=True)
+        with open(sciezka, "wb") as f:
+            f.write(dane)
+        return self._json({"ok": True, "plik": nazwa})
+
+    def do_DELETE(self):
+        if not self._z_interfejsu():
             return self._json({"blad": "zła strona"}, 403)
+        if urlparse(self.path).path == "/api/szablon":
+            return self._szablon("DELETE")
+        return self._wyslij(404, b"", "text/plain")
+
+    def do_POST(self):
+        url = urlparse(self.path)
+        if not self._z_interfejsu():
+            return self._json({"blad": "zła strona"}, 403)
+        if url.path == "/api/szablon":
+            return self._szablon("POST")
+        if url.path != "/api/zapisz":
+            return self._wyslij(404, b"", "text/plain")
         plik = parse_qs(url.query).get("plik", [""])[0]
         sciezka = self._bezpieczna(plik)
         if not sciezka or not sciezka.lower().endswith(".dmm"):

@@ -1,6 +1,7 @@
 // Operacje na kafelkach z historią do cofania.
 
 import { zmienne, korzen } from "./typy.js";
+import { atomNaTekst } from "./dmm.js";
 
 export const PODLOZE_PO_ROZBIORCE = "/turf/open/floor/plating";
 const POD_SCIANA = ["/obj/structure/cable", "/obj/machinery/atmospherics/pipe", "/obj/structure/disposalpipe", "/obj/structure/lattice"];
@@ -40,8 +41,8 @@ export function poPostawieniu(atomy, atom) {
     if (i >= 0) wynik[i] = atom; else wynik.push(atom);
     return wynik;
   }
-  const kier = kierunekAtomu(atom);
-  if (wynik.some((a) => a.typ === atom.typ && kierunekAtomu(a) === kier)) return null;
+  const tekst = atomNaTekst(atom);
+  if (wynik.some((a) => atomNaTekst(a) === tekst)) return null;
   let gdzie = wynik.findIndex((a) => jestTurf(a) || jestObszar(a));
   if (gdzie < 0) gdzie = wynik.length;
   wynik.splice(gdzie, 0, atom);
