@@ -277,6 +277,9 @@ export class ZrodloPliki extends ZrodloLokalne {
 
 // ---------------------------------------------------------------- GitHub (bez pobierania repo)
 
+// Wersja do pobrania (jeden plik HTML) bierze katalog ze strony edytora.
+const BAZA_DANYCH = (typeof window !== "undefined" && window.SS13_OFFLINE?.baza) || "";
+
 // Katalog typów zbudowany w CI (dane/katalog.json), mapy i ikony z raw.githubusercontent.com
 // z tego samego commita. Zapis pobiera plik .dmm do wgrania na GitHuba.
 export class ZrodloGithub extends ZrodloLokalne {
@@ -290,13 +293,13 @@ export class ZrodloGithub extends ZrodloLokalne {
   }
   static async wykryj() {
     try {
-      const r = await fetch("dane/info.json", { cache: "no-cache" });
+      const r = await fetch(BAZA_DANYCH + "dane/info.json", { cache: "no-cache" });
       if (!r.ok) return null;
       return new ZrodloGithub(await r.json());
     } catch { return null; }
   }
   async wczytajKatalog() {
-    this.katalog ??= await fetch("dane/katalog.json", { cache: "no-cache" }).then((r) => {
+    this.katalog ??= await fetch(BAZA_DANYCH + "dane/katalog.json", { cache: "no-cache" }).then((r) => {
       if (!r.ok) throw new Error("brak katalogu (" + r.status + ")");
       return r.json();
     });

@@ -202,6 +202,7 @@ body.z-kontrola #info { right: 380px; }
 .duzy-plik { display: block; text-align: center; padding: 10px; border: 1px solid var(--wybrany); background: #4a4430; cursor: pointer; margin: 8px 0; }
 .duzy-plik input { display: none; }
 .male { font-size: 12px; }
+#start-pobierz { display: block; margin: 6px 0 10px; color: var(--wybrany); }
 
 #komunikat { pointer-events: none; position: fixed; top: 46px; left: 50%; transform: translateX(-50%); background: var(--panel); border: 1px solid var(--wybrany); padding: 6px 14px; z-index: 20; }
 #komunikat.blad { border-color: var(--zle); }

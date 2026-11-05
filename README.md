@@ -20,6 +20,14 @@ W Firefoksie i Safari folder też da się wczytać, ale „Zapisz” pobiera wte
 
 Strona to zawartość folderu `web/`. Workflow `.github/workflows/strona.yml` publikuje ją na GitHub Pages przy każdym pushu na `main`.
 
+## Wersja do pobrania
+
+**https://aq33.github.io/ss13-edytor/edytor-map-ss13.html** (link „⬇ Pobierz edytor jako plik” jest też na ekranie startowym).
+
+To jeden plik HTML: zapisz go na dysku i otwórz dwuklikiem w Chrome albo Edge. Nie trzeba niczego instalować. Praca na własnym klonie repo działa w nim bez internetu. Przycisk „Edytuj mapy AquilaStation” potrzebuje internetu, bo mapy i ikony pobiera z GitHuba.
+
+Plik buduje CI (`zbuduj_offline.py`) przy każdej publikacji strony. Lokalnie: `python zbuduj_offline.py`, a wynik trafia do `dist/`.
+
 ## Uruchomienie lokalne (serwer)
 
 Wymagany jest tylko Python 3.10+, bez dodatkowych pakietów.

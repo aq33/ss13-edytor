@@ -2,3 +2,5 @@ dane/
 __pycache__/
 *.zapis
 szablony/*.json.tmp
+dist/
+web/edytor-map-ss13.html

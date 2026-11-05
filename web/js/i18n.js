@@ -132,6 +132,8 @@ const EN = {
   "i menu „Mapa”": "and the “Map” menu", "Nowa mapa, zmiana rozmiaru, dodawanie i usuwanie poziomów, eksport do PNG": "New map, resize, add and delete levels, export to PNG",
   "Raport inżyniera: błędy, ostrzeżenia i uwagi na bieżąco, z przeskokiem do kafelka": "Engineer's report: errors, warnings and notes as you work, with a jump to the tile",
   "Lekcje, które odhaczają się same": "Lessons that tick themselves off",
+  "⬇ Pobierz edytor jako plik (działa bez internetu)": "⬇ Download the editor as a file (works offline)",
+  "Jeden plik HTML – otwórz go z dysku w Chrome albo Edge, bez instalowania": "A single HTML file – open it from disk in Chrome or Edge, nothing to install",
   // samouczek (panel)
   "Pomiń": "Skip", "Dalej": "Next", "Gotowe!": "Done!", "Zacznij od nowa": "Start over",
   "Znasz już wszystkie narzędzia. Samouczek możesz otworzyć ponownie przyciskiem na górze.": "You know all the tools now. You can reopen the tutorial with the button at the top.",

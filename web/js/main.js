@@ -1747,7 +1747,8 @@ async function uruchom(z) {
   ladowanie("Czytam kod z " + z.nazwa + "…");
   try {
     const [kat, mapy] = await Promise.all([
-      fetch("kategorie.json").then((r) => r.json()),
+      // wersja do pobrania ma kategorie w środku pliku (z dysku nie da się ich pobrać fetch-em)
+      window.SS13_OFFLINE?.kategorie ?? fetch("kategorie.json").then((r) => r.json()),
       z.mapy(),
       wczytajTypy((t) => ladowanie(t)),
     ]);

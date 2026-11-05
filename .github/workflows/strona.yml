@@ -51,6 +51,9 @@ jobs:
           python buduj_katalog.py --repo aquila-repo --nazwa aq33/AquilaStation --galaz master \
             --sha "$(git -C aquila-repo rev-parse HEAD)" --wyjscie web/dane
 
+      - name: Wersja do pobrania (jeden plik HTML)
+        run: python zbuduj_offline.py web/edytor-map-ss13.html https://aq33.github.io/ss13-edytor/
+
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
