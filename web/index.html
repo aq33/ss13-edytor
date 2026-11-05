@@ -31,6 +31,9 @@
   <span id="poziomy"></span>
   <span class="sep"></span>
   <span id="nazwa-mapy" class="przygaszone">nie wczytano mapy</span>
+  <span id="stan-kopii" class="przygaszone male" title="Niezapisane zmiany są na bieżąco zachowywane w przeglądarce"></span>
+  <button id="b-pomoc" title="Lista funkcji i skrótów (F1)">Pomoc</button>
+  <button id="b-jezyk" title="Język / Language">EN</button>
   <span style="flex:1"></span>
   <button id="b-kontrola" title="Kontrola mapy">Kontrola</button>
   <button id="b-samouczek" title="Pokaż albo schowaj samouczek">Samouczek</button>
@@ -127,8 +130,8 @@
 <div id="start" class="okno ukryty">
   <div class="panel okno-tresc start-tresc">
     <div class="start-tytul">Edytor map SS13</div>
-    <p>Budowanie map jak w RimWorldzie: ikonki zamiast ścieżek, przeciąganie ścian i podłóg, kable, które łączą się same.</p>
-    <p>Wskaż <b>główny folder repozytorium</b> serwera, czyli ten z plikiem <code>.dme</code> (np. <code>AquilaStation</code> albo <code>NSV13-master</code>). Edytor przeczyta kod i ikony prosto z dysku, a zmiany zapisze do plików <code>.dmm</code>.</p>
+    <p data-en="Build maps like in RimWorld: icons instead of paths, drag walls and floors, cables that connect by themselves.">Budowanie map jak w RimWorldzie: ikonki zamiast ścieżek, przeciąganie ścian i podłóg, kable, które łączą się same.</p>
+    <p data-en="Point to the &lt;b&gt;main repository folder&lt;/b&gt; of the server – the one with the &lt;code&gt;.dme&lt;/code&gt; file (e.g. &lt;code&gt;AquilaStation&lt;/code&gt; or &lt;code&gt;NSV13-master&lt;/code&gt;). The editor reads code and icons straight from disk and saves changes to the &lt;code&gt;.dmm&lt;/code&gt; files.">Wskaż <b>główny folder repozytorium</b> serwera, czyli ten z plikiem <code>.dme</code> (np. <code>AquilaStation</code> albo <code>NSV13-master</code>). Edytor przeczyta kod i ikony prosto z dysku, a zmiany zapisze do plików <code>.dmm</code>.</p>
     <div id="start-blad" class="start-blad ukryty"></div>
     <button id="start-github" class="start-github ukryty">
       <span class="start-github-tytul">Edytuj mapy <span id="start-github-nazwa"></span></span>
@@ -141,18 +144,18 @@
       <button id="start-ponownie" class="duzy ukryty"></button>
     </div>
     <div id="start-bez-zapisu" class="ukryty">
-      <p class="przygaszone">Ta przeglądarka nie pozwala stronom zapisywać plików. Folder da się wczytać, a zapisana mapa pobierze się jako plik do podmiany w repo. Pełny zapis działa w Chrome i Edge.</p>
+      <p class="przygaszone" data-en="This browser does not let pages save files. The folder can be loaded and a saved map downloads as a file to replace in the repo. Full saving works in Chrome and Edge.">Ta przeglądarka nie pozwala stronom zapisywać plików. Folder da się wczytać, a zapisana mapa pobierze się jako plik do podmiany w repo. Pełny zapis działa w Chrome i Edge.</p>
       <label class="duzy-plik">Wczytaj folder repozytorium<input id="start-pliki" type="file" webkitdirectory multiple></label>
     </div>
-    <p class="przygaszone male">Nic nie jest wysyłane do internetu, wszystko dzieje się w Twojej przeglądarce. Przeglądarka zapyta o zgodę na dostęp do folderu. Pierwsze wczytanie kodu trwa kilka sekund, kolejne są szybsze. Przed commitem obejrzyj diff w gicie.</p>
+    <p class="przygaszone male" data-en="Nothing is sent to the internet – everything happens in your browser. The browser will ask for permission to access the folder. The first code load takes a few seconds, later ones are faster. Check the git diff before committing.">Nic nie jest wysyłane do internetu, wszystko dzieje się w Twojej przeglądarce. Przeglądarka zapyta o zgodę na dostęp do folderu. Pierwsze wczytanie kodu trwa kilka sekund, kolejne są szybsze. Przed commitem obejrzyj diff w gicie.</p>
   </div>
 </div>
 
 <div id="okno-wgranie" class="okno ukryty">
   <div class="panel okno-tresc start-tresc">
     <div class="start-tytul">Mapa pobrana</div>
-    <p>Plik <code id="wgranie-plik"></code> jest w folderze pobranych. Żeby trafił do gry, wgraj go na GitHuba w miejsce <code id="wgranie-sciezka"></code>:</p>
-    <ol>
+    <p data-en="The file &lt;code id=&quot;wgranie-plik&quot;&gt;&lt;/code&gt; is in your downloads folder. To get it into the game, upload it to GitHub in place of &lt;code id=&quot;wgranie-sciezka&quot;&gt;&lt;/code&gt;:">Plik <code id="wgranie-plik"></code> jest w folderze pobranych. Żeby trafił do gry, wgraj go na GitHuba w miejsce <code id="wgranie-sciezka"></code>:</p>
+    <ol data-en="&lt;li&gt;Click the button below (the upload page opens in the same repo folder).&lt;/li&gt;&lt;li&gt;Drag the downloaded file there and describe the change.&lt;/li&gt;&lt;li&gt;If you have no rights to the repo, GitHub creates a fork for you and suggests a Pull Request.&lt;/li&gt;">
       <li>Kliknij przycisk poniżej (otworzy się strona wgrywania w tym samym folderze repo).</li>
       <li>Przeciągnij tam pobrany plik i opisz zmianę.</li>
       <li>Jeśli nie masz uprawnień do repo, GitHub sam utworzy forka i zaproponuje Pull Request.</li>
@@ -163,6 +166,59 @@
     </div>
   </div>
 </div>
+
+<div id="okno-pomoc" class="okno ukryty"><div class="panel okno-tresc start-tresc">
+  <div class="pasek-pomocy"><span class="start-tytul">Lista funkcji</span><button id="pomoc-zamknij" title="Zamknij">✕</button></div>
+  <h3>Poruszanie się</h3>
+  <table>
+    <tr><td><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / strzałki</td><td>Przesuwanie widoku</td></tr>
+    <tr><td>PPM albo kółko + przeciąganie</td><td>Przesuwanie widoku</td></tr>
+    <tr><td>Kółko myszy</td><td>Przybliżanie i oddalanie</td></tr>
+    <tr><td><kbd>PageUp</kbd> / <kbd>PageDown</kbd></td><td>Następny / poprzedni poziom Z</td></tr>
+    <tr><td><kbd>G</kbd></td><td>Siatka kafelków</td></tr>
+    <tr><td>Panel „Widok”</td><td>Pokazywanie i ukrywanie warstw: podłoże, obiekty, dekale, rury, kable, pomocnicze, obszary</td></tr>
+  </table>
+  <h3>Budowanie</h3>
+  <table>
+    <tr><td><kbd>B</kbd> Architekt</td><td>Menu budowania z kategoriami i ikonkami, wyszukiwarka, podgrupy</td></tr>
+    <tr><td>LPM / przeciąganie</td><td>Stawianie: ściany jako obrys, podłogi i obszary jako wypełnienie, kable, rury i okna jako linia, meble pojedynczo</td></tr>
+    <tr><td><kbd>Q</kbd> / <kbd>E</kbd></td><td>Obrót stawianego obiektu</td></tr>
+    <tr><td>PPM / <kbd>Esc</kbd></td><td>Odłożenie narzędzia</td></tr>
+    <tr><td>Rzeczy na ścianę</td><td>Plakaty, APC, alarmy, światła same przyczepiają się do najbliższej ściany</td></tr>
+    <tr><td>Kable i rury</td><td>Łączą się same przy przeciąganiu</td></tr>
+    <tr><td><kbd>R</kbd> Pokój</td><td>Ściany dookoła i podłoga w środku jednym ruchem</td></tr>
+    <tr><td><kbd>X</kbd> Rozbiórka</td><td>Usuwa obiekty, ściany zamienia w poszycie; z <kbd>Shift</kbd> usuwa wszystko do kosmosu</td></tr>
+    <tr><td><kbd>F</kbd> Usuń podłogę</td><td>Podłoga staje się kosmosem, obiekty zostają</td></tr>
+  </table>
+  <h3>Przesuwanie i kopiowanie</h3>
+  <table>
+    <tr><td>Przeciągnij obiekt (Inspekcja)</td><td>Przenosi jeden obiekt na inny kafelek; obiekty ścienne przyczepiają się do nowej ściany</td></tr>
+    <tr><td><kbd>Ctrl</kbd> + przeciągnij obiekt</td><td>Przesunięcie w pikselach (z <kbd>Shift</kbd> co 8 px)</td></tr>
+    <tr><td><kbd>Alt</kbd> + strzałki</td><td>Wybrany obiekt o kafelek</td></tr>
+    <tr><td><kbd>Alt</kbd> + <kbd>Shift</kbd> + strzałki</td><td>Wybrany obiekt o piksel</td></tr>
+    <tr><td><kbd>M</kbd> Przenieś</td><td>Zaznacz prostokąt i kliknij w nowe miejsce; źródło staje się kosmosem</td></tr>
+    <tr><td><kbd>C</kbd> Kopiuj, <kbd>V</kbd> Wklej</td><td>Kopiowanie fragmentu mapy; „Zapisz jako szablon” zachowuje go w kategorii Szablony</td></tr>
+  </table>
+  <h3>Inspekcja i zmienne</h3>
+  <table>
+    <tr><td>Klik na kafelek</td><td>Lista wszystkiego, co na nim stoi (✕ w rogu zamyka)</td></tr>
+    <tr><td>⟲ ⟳</td><td>Obrót obiektu</td></tr>
+    <tr><td>⧉</td><td>Pipeta: buduj tym samym typem</td></tr>
+    <tr><td>✎</td><td>Edycja zmiennych: kierunek, stan ikony, dowolne zmienne</td></tr>
+    <tr><td>✕</td><td>Usunięcie obiektu (turf zmienia się w poszycie)</td></tr>
+  </table>
+  <h3>Cała mapa</h3>
+  <table>
+    <tr><td>Zakładki</td><td>Kilka map naraz, każda z własną historią cofania</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd></td><td>Cofnij / ponów</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>S</kbd></td><td>Zapis z potwierdzeniem i podsumowaniem zmian</td></tr>
+    <tr><td>Kopie robocze</td><td>Niezapisane zmiany na bieżąco trafiają do przeglądarki; po odświeżeniu strony edytor zaproponuje przywrócenie (lista w „Otwórz”)</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>F</kbd></td><td>Szukaj i zamień: zamiana typów, usuwanie i edycja zmiennych wielu obiektów naraz</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>N</kbd> i menu „Mapa”</td><td>Nowa mapa, zmiana rozmiaru, dodawanie i usuwanie poziomów, eksport do PNG</td></tr>
+    <tr><td>Kontrola</td><td>Raport inżyniera: błędy, ostrzeżenia i uwagi na bieżąco, z przeskokiem do kafelka</td></tr>
+    <tr><td>Samouczek</td><td>Lekcje, które odhaczają się same</td></tr>
+  </table>
+</div></div>
 
 <div id="ladowanie" class="okno ukryty"><div class="panel okno-tresc"><span id="ladowanie-tekst">Wczytywanie…</span></div></div>
 <div id="komunikat" class="ukryty"></div>

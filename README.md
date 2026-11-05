@@ -57,6 +57,10 @@ Przy pierwszym starcie i po zmianie plików `.dm` czyta kod (ok. 8 s). Wynik trz
 | Zakładki | każda otwarta mapa to osobna zakładka (własna historia cofania, poziom i kamera); ✕ albo środkowy przycisk zamyka |
 | Menu **Mapa ▾** | nowa mapa (`Ctrl+N`), zmiana rozmiaru z wyborem, gdzie zostaje stara zawartość, dodanie i usunięcie poziomu Z, eksport poziomu do PNG |
 | Szukaj i zamień | `Ctrl+F`: typ (z podtypami albo dokładnie), zakres: poziom, wszystkie poziomy albo zaznaczony prostokąt. Znalezione można zamienić na inny typ, usunąć albo ustawić im zmienne naraz (edycja wielu obiektów) |
+| Przesuwanie obiektu | w Inspekcji złap obiekt na mapie i przeciągnij na inny kafelek (ścienne przyczepiają się do nowej ściany). `Ctrl` + przeciąganie przesuwa w pikselach (`Shift` co 8 px). `Alt` + strzałki o kafelek, `Alt` + `Shift` + strzałki o piksel. Pod wybranym obiektem w Inspekcji są też przyciski i pola `pixel_x`/`pixel_y` |
+| Zapis | `Ctrl+S` pokazuje potwierdzenie: plik, dokąd idzie zapis, liczbę zmienionych kafelków i wynik kontroli |
+| Kopie robocze | niezapisane zmiany co kilka sekund trafiają do przeglądarki (IndexedDB). Po odświeżeniu strony edytor proponuje ich przywrócenie, a lista jest w „Otwórz” |
+| Pomoc i język | `F1` otwiera listę wszystkich funkcji. Przycisk `EN`/`PL` przełącza język interfejsu |
 | Inspekcja kafelka | bez narzędzia klik na kafelek: lista atomów z obracaniem, usuwaniem, pipetą (⧉) i edycją zmiennych (✎) |
 | Przesuwanie widoku | `WASD`, strzałki, środkowy albo prawy przycisk z przeciągnięciem |
 | Przybliżanie | kółko myszy |

@@ -1,14 +1,15 @@
-import { Mapa } from "./dmm.js";
+import { Mapa, atomNaTekst } from "./dmm.js";
 import { ikona } from "./dmi.js";
 import { wczytajTypy, wszystkie, zmienne, ileUzyc, korzen, zmienneAtomu } from "./typy.js";
-import { Widok, ikonkaTypu, kolorObszaru } from "./render.js";
+import { Widok, ikonkaTypu, kolorObszaru, warstwaAtomu } from "./render.js";
 import { nowyAtom, poPostawieniu, mozna, poRozbiorce, bezAtomu, obrocony, obrot, Historia } from "./edycja.js";
 import { autolacz, laczySie } from "./polaczenia.js";
 import { initSamouczek, zdarzenie, pokazSamouczek } from "./samouczek.js";
-import { zrodlo, ustawZrodlo, ZrodloFolder, ZrodloPliki, ZrodloSerwer, ZrodloGithub } from "./zrodlo.js";
+import { zrodlo, ustawZrodlo, ZrodloFolder, ZrodloPliki, ZrodloSerwer, ZrodloGithub, idbPobierz, idbZapisz, idbUsun, idbKlucze } from "./zrodlo.js";
+import { t, initJezyk, przelaczJezyk, jezyk } from "./i18n.js";
 import { ustawRegulySciany, jestScienny, przyciagnij, atomNaScianie } from "./sciana.js";
 import { sprawdzMape, SPRAWDZENIA, wagaProblemu } from "./kontrola.js";
-import { initOperacje, initSzukanie, nowaMapa, zmienRozmiar, dodajPoziom, usunPoziom, szukaj, przelaczSzukanie, wynikiSzukania, eksportPng } from "./operacje.js";
+import { dialog, initOperacje, initSzukanie, nowaMapa, zmienRozmiar, dodajPoziom, usunPoziom, szukaj, przelaczSzukanie, wynikiSzukania, eksportPng } from "./operacje.js";
 
 const $ = (s) => document.querySelector(s);
 const plotno = $("#plotno");
@@ -419,10 +420,23 @@ async function otworzMape(plik) {
   ladowanie("Wczytuję " + plik + "…");
   try {
     const tekst = await zrodlo.tekst(plik);
-    if (tekst === null) throw new Error("nie ma pliku " + plik);
-    const mapa = Mapa.parsuj(tekst, plik);
+    const kopia = await idbPobierz(kluczKopii(plik));
+    if (tekst === null && !kopia) throw new Error(t("nie ma pliku") + " " + plik);
+    const zPliku = tekst !== null ? Mapa.parsuj(tekst, plik) : null;
+    let mapa = zPliku;
+    let przywrocona = false;
+    if (kopia && kopia.tekst !== tekst) {
+      ladowanie(null);
+      const czas = new Date(kopia.czas).toLocaleString();
+      const tak = await dialog(t("Kopia robocza"), `${t("Ta mapa ma niezapisane zmiany z")} <b>${czas}</b>. ${t("Przywrócić je? „Anuluj” otworzy plik i usunie kopię.")}`, [], t("Przywróć"));
+      if (tak) { mapa = Mapa.parsuj(kopia.tekst, plik); mapa.nowa = kopia.nowa; przywrocona = true; }
+      else { idbUsun(kluczKopii(plik)); if (!zPliku) return; }
+      ladowanie(t("Wczytuję") + " " + plik + "…");
+    }
+    if (zPliku) zrzutMapy(mapa, zPliku);
     await wczytajIkonyMapy(mapa);
     dodajKarte(mapa);
+    if (przywrocona) ustawZmiany(true);
     try { localStorage.setItem("ostatnia-mapa:" + zrodlo.nazwa, plik); } catch {}
   } catch (e) {
     komunikat("Nie udało się wczytać mapy: " + e.message, true);
@@ -480,7 +494,7 @@ function ustawZmiany(v) {
   if (k) k.zmiany = v;
   $("#b-zapisz").classList.toggle("zmiany", v);
   if (bylo !== v) pokazKarty();
-  if (v) zaplanujKontrole();
+  if (v) { zaplanujKontrole(); zaplanujKopie(); }
 }
 
 // Po zapisie w trybie GitHub: plik się pobrał, teraz trzeba go wgrać (GitHub sam zrobi fork i PR).
@@ -492,16 +506,60 @@ function pokazWgranie(plik) {
 }
 $("#wgranie-zamknij").onclick = () => $("#okno-wgranie").classList.add("ukryty");
 
+// ---------------------------------------------------------------- kopie robocze w przeglądarce
+// Każda zmiana zapisuje się po chwili w IndexedDB – po odświeżeniu strony albo awarii
+// edytor zaproponuje przywrócenie. Kopia znika po prawdziwym zapisie.
+
+const kluczKopii = (plik) => `robocza:${zrodlo.nazwa}:${plik}`;
+let czasKopii = null;
+function zaplanujKopie() {
+  clearTimeout(czasKopii);
+  const mapa = stan.mapa;
+  if (!mapa) return;
+  czasKopii = setTimeout(() => {
+    if (!stan.karty.some((k) => k.mapa === mapa && (k === biezacaKarta() ? stan.zmiany : k.zmiany))) return;
+    idbZapisz(kluczKopii(mapa.plik), { plik: mapa.plik, tekst: mapa.zapisz(), czas: Date.now(), nowa: !!mapa.nowa });
+    $("#stan-kopii").textContent = t("kopia robocza zapisana") + " " + new Date().toLocaleTimeString().slice(0, 5);
+  }, 2500);
+}
+
+// Stan mapy z pliku (podpisy kafelków) – do liczenia, ile się zmieniło przed zapisem.
+function zrzutMapy(m, zrodlowa = m) {
+  m.zapisane = { szer: zrodlowa.szer, wys: zrodlowa.wys, poziomy: zrodlowa.poziomy, siatki: zrodlowa.siatki.map((s) => Array.from(s, (i) => zrodlowa.prefaby[i]?.podpis)) };
+}
+function zmienioneKafelki(m) {
+  const z = m.zapisane;
+  if (!z) return null;
+  if (z.szer !== m.szer || z.wys !== m.wys || z.poziomy !== m.poziomy) return -1;
+  let n = 0;
+  m.siatki.forEach((s, i) => { const a = z.siatki[i]; for (let k = 0; k < s.length; k++) if (m.prefaby[s[k]]?.podpis !== a[k]) n++; });
+  return n;
+}
+
 async function zapisz() {
   if (!stan.mapa) return;
-  ladowanie("Zapisuję…");
+  // potwierdzenie z podsumowaniem: ile się zmieniło, dokąd idzie zapis, co mówi kontrola
+  const m = stan.mapa;
+  const ile = zmienioneKafelki(m);
+  const wagi = liczWagi();
+  const dokad = { folder: t("prosto do pliku w Twoim folderze repo"), serwer: t("prosto do pliku w repo (serwer lokalny)"), github: t("pobierze plik .dmm do wgrania na GitHuba"), pliki: t("pobierze plik .dmm do podmiany w repo") }[zrodlo.rodzaj];
+  const opis = `<b>${m.plik}</b><br>${t("Zapis")}: ${dokad}.<br>` +
+    (ile === -1 ? t("Zmieniono rozmiar albo liczbę poziomów mapy.") : ile === null ? "" : `${t("Zmienione kafelki")}: <b>${ile}</b>.`) +
+    (wagi.blad ? `<div class="start-blad">⛔ ${t("Kontrola mapy zgłasza błędy")}: ${wagi.blad}. ${t("Mapa może się nie skompilować albo coś nie zadziała – sprawdź panel Kontrola.")}</div>` : "") +
+    (!wagi.blad && wagi.ostrzezenie ? `<p class="przygaszone">⚠ ${t("Ostrzeżenia kontroli")}: ${wagi.ostrzezenie}.</p>` : "");
+  if (!(await dialog(t("Zapisać mapę?"), opis, [], t("Zapisz")))) return;
+  ladowanie(t("Zapisuję…"));
   try {
     const tekst = stan.mapa.zapisz();
     const jak = await zrodlo.zapisz(stan.mapa.plik, tekst);
     ustawZmiany(false);
+    zrzutMapy(m);
+    clearTimeout(czasKopii);
+    idbUsun(kluczKopii(m.plik));
+    $("#stan-kopii").textContent = "";
     if (jak === "github") pokazWgranie(stan.mapa.plik);
     else if (jak === "pobrano") komunikat(`Pobrano ${stan.mapa.plik.split("/").pop()} – podmień nim plik ${stan.mapa.plik} w repo (ta przeglądarka nie zapisuje prosto na dysk).`);
-    else komunikat("Zapisano " + stan.mapa.plik);
+    else komunikat("✓ " + t("Zapisano") + " " + stan.mapa.plik);
     zdarzenie("zapisz");
   } catch (e) {
     komunikat("Zapis nie powiódł się: " + e.message, true);
@@ -805,6 +863,32 @@ widok.nakladki.push((g, w) => {
   }
   const n = stan.narzedzie;
   const pola = projekt();
+  if (!n && stan.chwyt?.aktywny) {
+    // przeciąganie obiektu: skąd (przerywana ramka) i gdzie wyląduje (podgląd)
+    const ch = stan.chwyt;
+    const zp = w.naEkran(ch.x, ch.y);
+    if (ch.piksele) {
+      // podgląd przesunięcia w pikselach na tym samym kafelku
+      if (ch.nowe) {
+        const zm = ch.atom.zm.filter(([k]) => k !== "pixel_x" && k !== "pixel_y").concat([["pixel_x", String(ch.nowe.x)], ["pixel_y", String(ch.nowe.y)]]);
+        w.rysujAtom(g, { typ: ch.atom.typ, zm }, ch.x, ch.y, 0.85);
+      }
+      g.strokeStyle = "#7fb0ff"; g.lineWidth = 1;
+      g.strokeRect(zp.sx + 0.5, zp.sy + 0.5, z - 1, z - 1);
+      return;
+    }
+    g.save(); g.setLineDash([5, 4]); g.strokeStyle = "#c7a846"; g.lineWidth = 2;
+    g.strokeRect(zp.sx + 1, zp.sy + 1, z - 2, z - 2); g.restore();
+    const cel = celPrzeniesienia(ch.atom, stan.kursor, stan.ulamek);
+    if (cel) {
+      const naCelu = cel.x === ch.x && cel.y === ch.y ? m.atomy(ch.x, ch.y, w.z).filter((_, i) => i !== ch.indeks) : m.atomy(cel.x, cel.y, w.z);
+      const p = w.naEkran(cel.x, cel.y);
+      w.rysujAtom(g, cel.atom, cel.x, cel.y, 0.75);
+      g.fillStyle = mozna(naCelu, cel.atom) ? "rgba(87,160,90,0.22)" : "rgba(192,69,58,0.45)";
+      g.fillRect(p.sx, p.sy, z, z);
+    }
+    return;
+  }
   if (!n) {
     if (stan.kursor && m.wewnatrz(stan.kursor.x, stan.kursor.y)) {
       const p = w.naEkran(stan.kursor.x, stan.kursor.y);
@@ -879,7 +963,9 @@ function pokazInspekcje() {
   const w = stan.wybrany;
   if (!m || !w) { el.classList.add("ukryty"); return; }
   const atomy = m.atomy(w.x, w.y, widok.z);
-  el.innerHTML = `<div class="naglowek" style="margin-bottom:6px">Kafelek (${w.x}, ${w.y}, ${widok.z})</div>`;
+  el.innerHTML = `<div class="pasek-inspekcji"><span class="naglowek">${t("Kafelek")} (${w.x}, ${w.y}, ${widok.z})</span><button class="zamknij-inspekcje" title="${t("Zamknij")}">✕</button></div>
+    <div class="przygaszone male">${t("Kliknij obiekt, żeby go wybrać. Przeciągnij na mapie albo Alt+strzałki – o kafelek, Alt+Shift+strzałki albo Ctrl+przeciąganie – o piksele.")}</div>`;
+  el.querySelector(".zamknij-inspekcje").onclick = () => { stan.wybrany = null; stan.wybranyAtom = null; pokazInspekcje(); widok.rysuj(); };
   for (const p of kontrola.naKafelku.get(widok.z + ":" + w.x + ":" + w.y) || []) {
     const d = document.createElement("div");
     const def = SPRAWDZENIA[p.kod];
@@ -906,9 +992,15 @@ function pokazInspekcje() {
     opis.children[1].textContent = a.typ + (edycje ? "  {" + edycje + "}" : "");
     opis.title = a.typ + (edycje ? "\n" + edycje : "");
     r.append(c, opis);
-    const przycisk = (tekst, tytul, fn) => { const b = document.createElement("button"); b.textContent = tekst; b.title = tytul; b.onclick = fn; r.append(b); };
+    const przycisk = (tekst, tytul, fn) => { const b = document.createElement("button"); b.textContent = tekst; b.title = t(tytul); b.onclick = (e) => { e.stopPropagation(); fn(); }; r.append(b); };
     const zmien = (nowe) => { if (!nowe) return; historia.zacznij(); zmienKafelek(w.x, w.y, nowe); historia.zakoncz(); ustawZmiany(true); pokazInspekcje(); widok.rysuj(); };
     const rk = korzen(a.typ);
+    if (ruchomy(a)) {
+      // wybór obiektu do przesuwania
+      r.classList.add("wybieralny");
+      if (stan.wybranyAtom === i || (stan.wybranyAtom == null && obiektDoZlapania(w.x, w.y) === i)) r.classList.add("wybrany-atom");
+      r.onclick = () => { stan.wybranyAtom = i; pokazInspekcje(); };
+    }
     if (rk === "obj" || rk === "mob") {
       przycisk("⟲", "Obróć w lewo", () => zmien(obrocony(atomy, i, -1)));
       przycisk("⟳", "Obróć w prawo", () => zmien(obrocony(atomy, i, 1)));
@@ -917,6 +1009,7 @@ function pokazInspekcje() {
     if (rk !== "area") przycisk("✎", "Edytuj zmienne", () => { stan.edycjaZm = stan.edycjaZm === i ? null : i; pokazInspekcje(); });
     if (rk !== "area") przycisk("✕", rk === "turf" ? "Zamień na poszycie" : "Usuń", () => zmien(bezAtomu(atomy, i)));
     el.append(r);
+    if (r.classList.contains("wybrany-atom")) el.append(sterowaniePrzesunieciem(w.x, w.y, i, a));
     if (stan.edycjaZm === i) el.append(formularzZmiennych(a, (zm) => {
       stan.edycjaZm = null;
       zmien(atomy.map((x, k) => (k === i ? { typ: a.typ, zm } : x)));
@@ -924,6 +1017,67 @@ function pokazInspekcje() {
     }));
   });
   el.classList.remove("ukryty");
+}
+
+// ---------------------------------------------------------------- przesunięcie w pikselach
+
+const pikseleAtomu = (a) => { const v = zmienneAtomu(a); return { x: +v.pixel_x || 0, y: +v.pixel_y || 0 }; };
+
+// Ustawia pixel_x/pixel_y (edycja znika, jeśli wartość wraca do tej z kodu).
+function ustawPiksele(x, y, indeks, px, py) {
+  const atomy = stan.mapa.atomy(x, y, widok.z);
+  const a = atomy[indeks];
+  if (!ruchomy(a)) return;
+  const dom = zmienne(a.typ);
+  let zm = a.zm.filter(([k]) => k !== "pixel_x" && k !== "pixel_y");
+  if (px !== (+dom.pixel_x || 0)) zm.push(["pixel_x", String(px)]);
+  if (py !== (+dom.pixel_y || 0)) zm.push(["pixel_y", String(py)]);
+  zm = zm.sort((p, q) => (p[0] < q[0] ? -1 : p[0] > q[0] ? 1 : 0));
+  const nowe = atomy.map((b, i) => (i === indeks ? { typ: a.typ, zm } : b));
+  historia.zacznij();
+  zmienKafelek(x, y, nowe);
+  historia.zakoncz();
+  ustawZmiany(true);
+  stan.wybranyAtom = indeks;
+  zdarzenie("piksele");
+  pokazInspekcje();
+  widok.rysuj();
+}
+
+// Pasek pod wybranym obiektem: przesuwanie o kafelek i o piksele.
+function sterowaniePrzesunieciem(x, y, indeks, a) {
+  const d = document.createElement("div");
+  d.className = "przesuniecie";
+  const p = pikseleAtomu(a);
+  d.innerHTML = `<span class="przygaszone">${t("Kafelek")}:</span>
+    <button data-k="8" title="${t("W lewo o kafelek")}">◀</button><button data-k="1" title="${t("W górę o kafelek")}">▲</button><button data-k="2" title="${t("W dół o kafelek")}">▼</button><button data-k="4" title="${t("W prawo o kafelek")}">▶</button>
+    <span class="przygaszone">${t("Piksele")}:</span>
+    <button data-p="-1,0" title="${t("W lewo o piksel (Shift: 8)")}">←</button><button data-p="0,1" title="${t("W górę o piksel (Shift: 8)")}">↑</button><button data-p="0,-1" title="${t("W dół o piksel (Shift: 8)")}">↓</button><button data-p="1,0" title="${t("W prawo o piksel (Shift: 8)")}">→</button>
+    <input class="px" type="number" value="${p.x}" title="pixel_x"><input class="px" type="number" value="${p.y}" title="pixel_y">
+    <button data-zero title="${t("Wyzeruj przesunięcie")}">0</button>`;
+  d.querySelectorAll("[data-k]").forEach((b) => (b.onclick = () => przesunOKafelek(x, y, indeks, +b.dataset.k)));
+  d.querySelectorAll("[data-p]").forEach((b) => (b.onclick = (e) => {
+    const [dx, dy] = b.dataset.p.split(",").map(Number);
+    const krok = e.shiftKey ? 8 : 1;
+    ustawPiksele(x, y, indeks, p.x + dx * krok, p.y + dy * krok);
+  }));
+  const [ix, iy] = d.querySelectorAll("input.px");
+  const zatwierdz = () => ustawPiksele(x, y, indeks, Math.round(+ix.value || 0), Math.round(+iy.value || 0));
+  ix.onchange = zatwierdz; iy.onchange = zatwierdz;
+  d.querySelector("[data-zero]").onclick = () => {
+    const dom = zmienne(a.typ);
+    ustawPiksele(x, y, indeks, +dom.pixel_x || 0, +dom.pixel_y || 0);
+  };
+  return d;
+}
+
+const KROK_KIER = { 1: [0, 1], 2: [0, -1], 4: [1, 0], 8: [-1, 0] };
+function przesunOKafelek(x, y, indeks, d) {
+  const atom = stan.mapa.atomy(x, y, widok.z)[indeks];
+  const k = { x: x + KROK_KIER[d][0], y: y + KROK_KIER[d][1] };
+  // obiekt ścienny: szukaj ściany od strony, w którą przesuwamy
+  const u = { 1: { fx: 0.5, fy: 1 }, 2: { fx: 0.5, fy: 0 }, 4: { fx: 1, fy: 0.5 }, 8: { fx: 0, fy: 0.5 } }[d];
+  przeniesObiekt(x, y, indeks, celPrzeniesienia(atom, k, u));
 }
 
 const kierunekZAtomu = (a) => +(a.zm.find(([k]) => k === "dir")?.[1] ?? (zmienne(a.typ).dir | 0 || 2));
@@ -1008,6 +1162,16 @@ function formularzZmiennych(atom, zastosuj) {
 function pokazPodpowiedz(e) {
   const el = $("#podpowiedz");
   const n = stan.narzedzie;
+  if (stan.chwyt?.aktywny && e) {
+    const ch = stan.chwyt;
+    el.textContent = ch.piksele
+      ? `${ladnaNazwa(ch.atom.typ)} · pixel_x = ${ch.nowe?.x ?? pikseleAtomu(ch.atom).x}, pixel_y = ${ch.nowe?.y ?? pikseleAtomu(ch.atom).y} · ${t("Shift: co 8 px")}`
+      : t("Przesuwam") + ": " + ladnaNazwa(ch.atom.typ) + " · " + t("puść, żeby postawić · PPM anuluje");
+    el.style.left = e.clientX + 18 + "px";
+    el.style.top = e.clientY + 18 + "px";
+    el.classList.remove("ukryty");
+    return;
+  }
   if (!n || !e) { el.classList.add("ukryty"); return; }
   let tekst;
   if (n.rodzaj === "rozbiorka") tekst = e.shiftKey ? "Rozbiórka + Shift – usuwa wszystko, zostaje sam kosmos" : "Rozbiórka – usuwa obiekty, ściany zostają poszyciem · z Shiftem: wszystko do kosmosu";
@@ -1044,19 +1208,96 @@ plotno.addEventListener("contextmenu", (e) => e.preventDefault());
 // Bez tego Chrome po wciśnięciu kółka włącza autoprzewijanie strony.
 plotno.addEventListener("auxclick", (e) => e.preventDefault());
 
+// ---------------------------------------------------------------- przesuwanie pojedynczego obiektu
+// W Inspekcji: złap obiekt lewym przyciskiem i przeciągnij na inny kafelek (albo Alt+strzałki).
+
+const ruchomy = (a) => !!a && (a.typ.startsWith("/obj") || a.typ.startsWith("/mob"));
+
+// Który obiekt złapać: wybrany w inspekcji albo ten, który leży na wierzchu (i jest widoczny).
+function obiektDoZlapania(x, y) {
+  if (!stan.mapa?.wewnatrz(x, y)) return -1;
+  const atomy = stan.mapa.atomy(x, y, widok.z);
+  if (stan.wybrany?.x === x && stan.wybrany?.y === y && ruchomy(atomy[stan.wybranyAtom])) return stan.wybranyAtom;
+  let najlepszy = -1, klucz = null;
+  atomy.forEach((a, i) => {
+    if (!ruchomy(a) || !widok.warstwy[warstwaAtomu(a.typ)]) return;
+    const v = zmienneAtomu(a);
+    const k = [v.plane | 0, +v.layer || 0, -i]; // przy równej warstwie wyżej rysuje się wcześniejszy na liście
+    if (!klucz || k[0] > klucz[0] || (k[0] === klucz[0] && (k[1] > klucz[1] || (k[1] === klucz[1] && k[2] > klucz[2])))) { najlepszy = i; klucz = k; }
+  });
+  return najlepszy;
+}
+
+// Gdzie wyląduje przenoszony obiekt. Obiekty ścienne przyczepiają się do nowej ściany
+// (zachowując swoje pozostałe zmienne), reszta ląduje na kafelku pod kursorem.
+function celPrzeniesienia(atom, k, u = { fx: 0.5, fy: 0.5 }) {
+  if (!k || !stan.mapa.wewnatrz(k.x, k.y)) return null;
+  if (jestScienny(atom.typ)) {
+    const s = przyciagnij(stan.mapa, widok.z, k, u.fx, u.fy);
+    if (s) {
+      const nowy = atomNaScianie(atom.typ, s.d);
+      const montaz = new Set(["dir", "pixel_x", "pixel_y"]);
+      const zm = [...nowy.zm, ...atom.zm.filter(([n]) => !montaz.has(n) && !nowy.zm.some(([m]) => m === n))]
+        .sort((p, q) => (p[0] < q[0] ? -1 : p[0] > q[0] ? 1 : 0));
+      return { x: s.x, y: s.y, atom: { typ: nowy.typ, zm } };
+    }
+  }
+  return { x: k.x, y: k.y, atom };
+}
+
+// Przenosi atom nr indeks z (x, y) do celu jedną operacją w historii. Zwraca true, jeśli się udało.
+function przeniesObiekt(x, y, indeks, cel) {
+  const m = stan.mapa;
+  const zrodlo = m.atomy(x, y, widok.z);
+  const atom = zrodlo[indeks];
+  if (!cel || !ruchomy(atom)) return false;
+  const bezNiego = zrodlo.filter((_, i) => i !== indeks);
+  const naCelu = cel.x === x && cel.y === y ? bezNiego : m.atomy(cel.x, cel.y, widok.z);
+  if (!mozna(naCelu, cel.atom)) { komunikat("Tu nie da się postawić tego obiektu", true); return false; }
+  const poCelu = poPostawieniu(naCelu, cel.atom);
+  if (!poCelu) { komunikat("Na tym kafelku stoi już taki sam obiekt", true); return false; }
+  historia.zacznij();
+  zmienKafelek(x, y, bezNiego);
+  zmienKafelek(cel.x, cel.y, poCelu);
+  historia.zakoncz();
+  ustawZmiany(true);
+  stan.wybrany = { x: cel.x, y: cel.y };
+  stan.wybranyAtom = poCelu.indexOf(poCelu.find((a) => atomNaTekst(a) === atomNaTekst(cel.atom)));
+  stan.edycjaZm = null;
+  pokazInspekcje();
+  zdarzenie("przesun-obiekt");
+  widok.rysuj();
+  return true;
+}
+
+function anulujChwyt() {
+  if (!stan.chwyt) return;
+  stan.chwyt = null;
+  plotno.style.cursor = "default";
+  pokazPodpowiedz(null);
+  widok.rysuj();
+}
+
 plotno.addEventListener("mousedown", (e) => {
   if (!stan.mapa) return;
   const r = plotno.getBoundingClientRect();
   const kaf = widok.naKafelek(e.clientX - r.left, e.clientY - r.top);
   if (e.button === 1 || e.button === 2) {
+    if (e.button === 2 && stan.chwyt?.aktywny) { anulujChwyt(); e.preventDefault(); return; }
     przesuwanie = { x: e.clientX, y: e.clientY, kx: widok.kam.x, ky: widok.kam.y, ruszyl: false, przycisk: e.button };
     e.preventDefault();
     return;
   }
   if (e.button !== 0) return;
   if (!stan.narzedzie) {
+    const tenSam = stan.wybrany?.x === kaf.x && stan.wybrany?.y === kaf.y;
     stan.wybrany = stan.mapa.wewnatrz(kaf.x, kaf.y) ? kaf : null;
+    if (!tenSam) stan.wybranyAtom = null;
     stan.edycjaZm = null;
+    // złapanie obiektu – przeciąganie zacznie się, gdy mysz ruszy się o kilka pikseli
+    const indeks = obiektDoZlapania(kaf.x, kaf.y);
+    stan.chwyt = indeks >= 0 ? { x: kaf.x, y: kaf.y, indeks, atom: stan.mapa.atomy(kaf.x, kaf.y, widok.z)[indeks], px: e.clientX, py: e.clientY, aktywny: false, piksele: e.ctrlKey } : null;
+    if (stan.chwyt) stan.wybranyAtom = indeks;
     pokazInspekcje();
     widok.rysuj();
     return;
@@ -1088,8 +1329,22 @@ window.addEventListener("mousemove", (e) => {
   const innaCwiartka = !stan.ulamek || (ulamek.fx > ulamek.fy) !== (stan.ulamek.fx > stan.ulamek.fy) || (ulamek.fx + ulamek.fy > 1) !== (stan.ulamek.fx + stan.ulamek.fy > 1);
   stan.ulamek = ulamek;
   if (stan.przeciaganie && stan.narzedzie?.tryb === "pojedynczo" && stan.mapa.wewnatrz(kaf.x, kaf.y)) stan.przeciaganie.pola.set(kluczPola(kaf.x, kaf.y), kaf);
+  const ch = stan.chwyt;
+  if (ch && !ch.aktywny && e.buttons & 1 && Math.abs(e.clientX - ch.px) + Math.abs(e.clientY - ch.py) > (ch.piksele ? 1 : 5)) {
+    ch.aktywny = true;
+    widok.rysuj();
+  }
+  if (ch?.aktywny && ch.piksele) {
+    // Ctrl+przeciąganie: przesunięcie w pikselach (Shift – co 8 px)
+    const krok = e.shiftKey ? 8 : 1;
+    const p0 = pikseleAtomu(ch.atom);
+    const dx = Math.round(((e.clientX - ch.px) / widok.kam.zoom) * 32 / krok) * krok;
+    const dy = Math.round((-(e.clientY - ch.py) / widok.kam.zoom) * 32 / krok) * krok;
+    if (dx !== ch.dx || dy !== ch.dy) { ch.dx = dx; ch.dy = dy; ch.nowe = { x: p0.x + dx, y: p0.y + dy }; widok.rysuj(); }
+  }
+  if (!stan.narzedzie) plotno.style.cursor = ch?.aktywny ? "grabbing" : obiektDoZlapania(kaf.x, kaf.y) >= 0 ? "grab" : "default";
   if (zmiana) pokazInfo();
-  if (zmiana || (innaCwiartka && stan.narzedzie?.scienny)) widok.rysuj();
+  if (zmiana || (innaCwiartka && (stan.narzedzie?.scienny || (ch?.aktywny && jestScienny(ch.atom.typ))))) widok.rysuj();
   pokazPodpowiedz(e);
 });
 
@@ -1101,6 +1356,21 @@ window.addEventListener("mouseup", (e) => {
       if (stan.przeciaganie) { stan.przeciaganie = null; widok.rysuj(); }
       else if (stan.narzedzie) anulujNarzedzie();
       pokazPodpowiedz(null);
+    }
+    return;
+  }
+  if (e.button === 0 && stan.chwyt) {
+    const ch = stan.chwyt;
+    stan.chwyt = null;
+    if (ch.aktywny && ch.piksele) {
+      if (ch.nowe) ustawPiksele(ch.x, ch.y, ch.indeks, ch.nowe.x, ch.nowe.y);
+      pokazPodpowiedz(null);
+      widok.rysuj();
+    } else if (ch.aktywny) {
+      przeniesObiekt(ch.x, ch.y, ch.indeks, celPrzeniesienia(ch.atom, stan.kursor, stan.ulamek));
+      plotno.style.cursor = "grab";
+      pokazPodpowiedz(null);
+      widok.rysuj();
     }
     return;
   }
@@ -1171,6 +1441,20 @@ window.addEventListener("keydown", (e) => {
   if (e.ctrlKey && k === "f") { e.preventDefault(); if (stan.mapa) przelaczSzukanie(true); return; }
   if (e.ctrlKey && k === "n") { e.preventDefault(); nowaMapa(); return; }
   if (e.ctrlKey) return;
+  if (e.altKey && k.startsWith("arrow")) {
+    // Alt+strzałki: wybrany obiekt o kafelek, Alt+Shift+strzałki: o piksel
+    e.preventDefault();
+    const w = stan.wybrany;
+    if (!w || stan.narzedzie) return;
+    const indeks = obiektDoZlapania(w.x, w.y);
+    if (indeks < 0) return;
+    const d = { arrowup: 1, arrowdown: 2, arrowright: 4, arrowleft: 8 }[k];
+    if (e.shiftKey) {
+      const p = pikseleAtomu(stan.mapa.atomy(w.x, w.y, widok.z)[indeks]);
+      ustawPiksele(w.x, w.y, indeks, p.x + KROK_KIER[d][0], p.y + KROK_KIER[d][1]);
+    } else przesunOKafelek(w.x, w.y, indeks, d);
+    return;
+  }
   if (["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright"].includes(k)) {
     const pusto = !wcisniete.size;
     wcisniete.add(k);
@@ -1180,7 +1464,7 @@ window.addEventListener("keydown", (e) => {
   }
   if (k === "q" || k === "e") { stan.kierunek = obrot(stan.kierunek, k === "e" ? 1 : -1); zdarzenie("obrot"); pokazPodpowiedz(ostatniaMysz); widok.rysuj(); }
   else if (k === "shift") { pokazPodpowiedz(ostatniaMysz); widok.rysuj(); }
-  else if (k === "escape") { if (stan.narzedzie) anulujNarzedzie(); else { stan.wybrany = null; pokazInspekcje(); widok.rysuj(); } }
+  else if (k === "escape") { if (stan.chwyt) anulujChwyt(); else if (stan.narzedzie) anulujNarzedzie(); else { stan.wybrany = null; pokazInspekcje(); widok.rysuj(); } }
   else if (k === "pageup") ustawPoziom(widok.z + 1);
   else if (k === "pagedown") ustawPoziom(widok.z - 1);
   else if (k === "b") przelaczArchitekta();
@@ -1389,10 +1673,23 @@ for (const c of document.querySelectorAll("#warstwy [data-w]")) {
 }
 
 let listaMap = [];
-function pokazListeMap() {
+async function pokazListeMap() {
   const f = $("#szukaj-mapy").value.trim().toLowerCase();
   const el = $("#lista-map");
+  // kopie robocze z przeglądarki na górze listy (też nowe mapy, których nie ma jeszcze w repo)
+  const kopie = zrodlo ? await idbKlucze(`robocza:${zrodlo.nazwa}:`) : [];
   el.innerHTML = "";
+  for (const k of kopie) {
+    const plik = k.slice(`robocza:${zrodlo.nazwa}:`.length);
+    if (!plik.toLowerCase().includes(f)) continue;
+    const d = document.createElement("div");
+    d.className = "kopia-robocza";
+    d.innerHTML = "<span></span><small></small>";
+    d.children[0].textContent = "✎ " + plik.replace(/^_maps\//, "");
+    d.children[1].textContent = t("kopia robocza");
+    d.onclick = () => { $("#okno-map").classList.add("ukryty"); otworzMape(plik); };
+    el.append(d);
+  }
   for (const m of listaMap.filter((m) => m.plik.toLowerCase().includes(f))) {
     const d = document.createElement("div");
     d.innerHTML = "<span></span><small></small>";
@@ -1483,6 +1780,27 @@ async function uruchom(z) {
     else pokazStart(e.message);
   }
 }
+
+// Pomoc (lista funkcji) i język.
+$("#b-pomoc").onclick = () => $("#okno-pomoc").classList.remove("ukryty");
+$("#pomoc-zamknij").onclick = () => $("#okno-pomoc").classList.add("ukryty");
+$("#okno-pomoc").onclick = (e) => { if (e.target.id === "okno-pomoc") $("#okno-pomoc").classList.add("ukryty"); };
+$("#b-jezyk").onclick = async () => {
+  zapamietajKarte();
+  const zmienione = stan.karty.filter((k) => k.zmiany);
+  if (zmienione.length && !confirm(jezyk() === "en" ? "Unsaved changes stay as drafts in the browser. Switch language?" : "Niezapisane zmiany zostaną jako kopie robocze w przeglądarce. Zmienić język?")) return;
+  // kopie robocze od razu, bez czekania na opóźniony zapis
+  clearTimeout(czasKopii);
+  await Promise.all(zmienione.map((k) => idbZapisz(kluczKopii(k.mapa.plik), { plik: k.mapa.plik, tekst: k.mapa.zapisz(), czas: Date.now(), nowa: !!k.mapa.nowa })));
+  for (const k of stan.karty) k.zmiany = false;
+  stan.zmiany = false;
+  przelaczJezyk();
+};
+window.addEventListener("keydown", (e) => {
+  if (e.key === "F1") { e.preventDefault(); $("#okno-pomoc").classList.toggle("ukryty"); }
+  if (e.key === "Escape") $("#okno-pomoc").classList.add("ukryty");
+});
+initJezyk();
 
 async function start() {
   // serwer.py działa tylko lokalnie – na stronie z linka od razu wybór folderu

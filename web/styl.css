@@ -155,6 +155,15 @@ body.z-kontrola #info { right: 380px; }
 #kontrola .porada { font-size: 12px; color: var(--przygaszony); padding: 2px 8px 6px 22px; line-height: 1.4; }
 #kontrola .wynik { font: 12px Consolas, monospace; padding: 1px 8px 1px 22px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #kontrola .wynik:hover { background: var(--przycisk-hover); }
+#inspekcja .pasek-inspekcji { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px; }
+#inspekcja .pasek-inspekcji button { padding: 0 6px; }
+#inspekcja .male { margin-bottom: 6px; line-height: 1.35; }
+#inspekcja .wiersz.wybieralny { cursor: pointer; }
+#inspekcja .wiersz.wybieralny:hover { background: #20262b; }
+#inspekcja .wiersz.wybrany-atom { background: #2b2a1f; outline: 1px solid var(--wybrany); }
+#inspekcja .przesuniecie { display: flex; flex-wrap: wrap; align-items: center; gap: 3px; padding: 4px 6px 6px 42px; font-size: 12px; background: #161b1f; border-bottom: 1px solid #2f363c; }
+#inspekcja .przesuniecie button { padding: 0 6px; min-width: 22px; }
+#inspekcja .przesuniecie input.px { width: 52px; background: #0b0d0f; color: var(--tekst); border: 1px solid var(--ramka); padding: 1px 4px; font: 12px Consolas, monospace; }
 #inspekcja .problem-kafelka { color: var(--kolor); font-size: 12px; padding: 2px 4px; margin-bottom: 4px; border-left: 3px solid var(--kolor); background: #161b1f; cursor: help; }
 
 #podpowiedz { position: fixed; pointer-events: none; background: rgba(0,0,0,.75); padding: 3px 7px; font-size: 12px; border: 1px solid var(--ramka); white-space: nowrap; }
@@ -168,6 +177,13 @@ body.z-kontrola #info { right: 380px; }
 #lista-map div { padding: 4px 8px; cursor: pointer; display: flex; justify-content: space-between; gap: 10px; }
 #lista-map div:hover { background: var(--przycisk-hover); }
 #lista-map small { color: var(--przygaszony); }
+#lista-map .kopia-robocza { background: #2b2a1f; }
+#stan-kopii { white-space: nowrap; flex: none; }
+#okno-pomoc .okno-tresc { width: min(860px, 96vw); max-height: 88vh; overflow-y: auto; }
+#okno-pomoc h3 { color: var(--wybrany); margin: 14px 0 4px; font-size: 14px; }
+#okno-pomoc table { width: 100%; border-collapse: collapse; font-size: 13px; }
+#okno-pomoc td { padding: 3px 6px; border-bottom: 1px solid #2a3036; vertical-align: top; }
+#okno-pomoc td:first-child { width: 34%; color: #fff; white-space: nowrap; }
 
 .start-tresc { width: min(560px, 94vw); padding: 22px 24px; line-height: 1.5; }
 .start-tytul { font-size: 22px; font-weight: 700; color: var(--wybrany); margin-bottom: 8px; }

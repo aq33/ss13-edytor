@@ -1,3 +1,5 @@
+import { jezyk } from "./i18n.js";
+
 // Samouczek: lekcje odhaczają się same, gdy zrobisz daną rzecz w edytorze.
 // main.js zgłasza czynności przez zdarzenie(nazwa, dane).
 
@@ -44,6 +46,9 @@ const LEKCJE = [
   { id: "inspekcja", tytul: "Inspekcja i zmienne",
     tekst: "Bez narzędzia (<kbd>Esc</kbd>) kliknij kafelek: zobaczysz wszystko, co na nim stoi. <b>✎</b> edytuje zmienne (kierunek, stan ikony, nazwa…), <b>⧉</b> bierze typ do budowania, <b>✕</b> usuwa.",
     gotowe: (z) => z.nazwa === "zmienne" },
+  { id: "przesun-obiekt", tytul: "Przesuwanie pojedynczego obiektu",
+    tekst: "Bez narzędzia (<kbd>Esc</kbd>) złap obiekt na mapie lewym przyciskiem i przeciągnij na inny kafelek. Z <kbd>Ctrl</kbd> przesuwasz go po pikselach (z <kbd>Shift</kbd> co 8 px). <kbd>Alt</kbd>+strzałki przesuwają wybrany obiekt o kafelek.",
+    gotowe: (z) => z.nazwa === "przesun-obiekt" || z.nazwa === "piksele" },
   { id: "szukaj", tytul: "Szukaj i zamień",
     tekst: "<kbd>Ctrl</kbd>+<kbd>F</kbd> (albo menu <b>Mapa ▾</b>): wpisz typ, a znalezione kafelki podświetlą się na mapie. Możesz je wszystkie zamienić na inny typ, usunąć albo ustawić im zmienne naraz. „Zaznacz obszar” zawęża szukanie do prostokąta.",
     gotowe: (z) => z.nazwa === "szukaj" },
@@ -54,6 +59,30 @@ const LEKCJE = [
     tekst: "<kbd>Ctrl</kbd>+<kbd>S</kbd> albo <b>Zapisz</b> zapisuje mapę do repo. Kropka przy „Zapisz” oznacza niezapisane zmiany. Przed commitem obejrzyj diff w gicie.",
     gotowe: (z) => z.nazwa === "zapisz" },
 ];
+
+// Wersja angielska lekcji (id -> [tytuł, tekst]).
+const LEKCJE_EN = {
+  kamera: ["Looking around", "Pan with <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or by dragging with the <b>right</b> or middle mouse button. The wheel zooms in and out."],
+  architekt: ["The Architect menu", "Click <b>Architect</b> at the bottom (or <kbd>B</kbd>) and pick a category on the left, e.g. <b>Floors</b>. The most used things come first; search is at the top."],
+  podloga: ["Laying floor", "Click a floor icon, then <b>drag with the left button</b> on the map. The floor fills the whole rectangle. Green preview = can be placed, red = can't."],
+  sciany: ["Walls", "In <b>Walls</b> pick a wall and drag. You get the outline of a room and the walls join up by themselves."],
+  pokoj: ["A room in one go", "Press <kbd>R</kbd> (the <b>Room</b> button) and drag: walls around, floor inside. It uses the last wall and floor you picked."],
+  meble: ["Furniture and rotation", "In <b>Furniture</b> pick a chair. Rotate it with <kbd>Q</kbd>/<kbd>E</kbd> (the direction shows next to the cursor) and click to place it."],
+  sciana: ["Wall-mounted things", "In <b>Wall-mounted</b> pick e.g. a poster, alarm or APC and hover over a wall. It snaps to it on the side of the cursor, with the direction and offset our maps use. Lights from <b>Lighting</b> work the same."],
+  kable: ["Cables and pipes", "In <b>Power</b> pick a cable and drag a line with a corner. Cables connect by themselves, also to existing ones nearby. Pipes from <b>Pipes & atmos</b> work the same."],
+  cofnij: ["Cancel and undo", "<b>RMB</b> or <kbd>Esc</kbd> puts the tool down. <kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes the last change, <kbd>Ctrl</kbd>+<kbd>Y</kbd> redoes it. Undo something now."],
+  rozbiorka: ["Deconstruct", "<kbd>X</kbd> and drag: objects disappear and walls turn into plating. Holding <kbd>Shift</kbd> removes <b>everything</b> down to space."],
+  "usun-podloge": ["Removing floor", "<kbd>F</kbd> (the <b>Remove floor</b> button) and drag: the floor turns into space, objects and walls stay."],
+  przenies: ["Moving a section", "<kbd>M</kbd> (<b>Move</b>): select a rectangle and release. The section “hangs” under the cursor – click the new spot. Space is left behind. RMB cancels."],
+  kopiuj: ["Copying and templates", "<kbd>C</kbd> selects a rectangle and every click pastes a copy. <b>Save as template</b> keeps it in the <b>Templates</b> category of the Architect."],
+  inspekcja: ["Inspect and variables", "With no tool (<kbd>Esc</kbd>) click a tile to see everything on it. <b>✎</b> edits variables (direction, icon state, name…), <b>⧉</b> picks the type for building, <b>✕</b> deletes."],
+  "przesun-obiekt": ["Moving a single object", "With no tool (<kbd>Esc</kbd>) grab an object on the map with the left button and drag it to another tile. With <kbd>Ctrl</kbd> you move it by pixels (<kbd>Shift</kbd>: 8 px steps). <kbd>Alt</kbd>+arrows move the selected object by a tile."],
+  szukaj: ["Find & replace", "<kbd>Ctrl</kbd>+<kbd>F</kbd> (or the <b>Map ▾</b> menu): type a type and the found tiles light up. You can replace them all with another type, delete them or set their variables at once. “Select area” limits the search to a rectangle."],
+  kontrola: ["Map checks", "The <b>Checks</b> button at the top works like the engineer's report in KSP: it checks the map as you work and counts ⛔ errors, ⚠ warnings and ℹ notes (area without an APC, broken cable, door in a wall…). Open it and click an entry to jump to the tile."],
+  zapis: ["Saving", "<kbd>Ctrl</kbd>+<kbd>S</kbd> or <b>Save</b> writes the map (you get a summary first). Unsaved changes are kept as drafts in the browser, so a reload loses nothing. Check the git diff before committing."],
+};
+const tytulLekcji = (l) => (jezyk() === "en" && LEKCJE_EN[l.id] ? LEKCJE_EN[l.id][0] : l.tytul);
+const tekstLekcji = (l) => (jezyk() === "en" && LEKCJE_EN[l.id] ? LEKCJE_EN[l.id][1] : l.tekst);
 
 const KLUCZ = "samouczek-postep";
 let ukonczone = new Set();
@@ -84,9 +113,9 @@ function rysuj() {
       <span style="flex:1"></span><button data-a="zamknij" title="Schowaj (wróci z przycisku Samouczek na górze)">✕</button></div>
     <div class="postep"><div style="width:${(ukonczone.size / LEKCJE.length) * 100}%"></div></div>
     ${wszystko ? `<div class="lekcja"><div class="tytul-lekcji">Gotowe!</div><p>Znasz już wszystkie narzędzia. Samouczek możesz otworzyć ponownie przyciskiem na górze.</p><button data-a="od-nowa">Zacznij od nowa</button></div>`
-      : `<div class="lekcja"><div class="tytul-lekcji">${biezaca + 1}. ${l.tytul}</div><p>${l.tekst}</p>
+      : `<div class="lekcja"><div class="tytul-lekcji">${biezaca + 1}. ${tytulLekcji(l)}</div><p>${tekstLekcji(l)}</p>
       <div class="przyciski-lekcji"><button data-a="pomin">Pomiń</button>${ukonczone.has(l.id) ? `<button data-a="dalej">Dalej</button>` : ""}</div></div>`}
-    <ol class="spis">${LEKCJE.map((x, i) => `<li data-i="${i}" class="${ukonczone.has(x.id) ? "zrobione" : ""} ${i === biezaca && !wszystko ? "teraz" : ""}">${x.tytul}</li>`).join("")}</ol>`;
+    <ol class="spis">${LEKCJE.map((x, i) => `<li data-i="${i}" class="${ukonczone.has(x.id) ? "zrobione" : ""} ${i === biezaca && !wszystko ? "teraz" : ""}">${tytulLekcji(x)}</li>`).join("")}</ol>`;
   el.onclick = (e) => {
     const a = e.target.dataset.a;
     const i = e.target.dataset.i;

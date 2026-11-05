@@ -30,7 +30,14 @@ export async function idbZapisz(klucz, wartosc) {
     await new Promise((ok, zle) => { const t = db.transaction("kv", "readwrite"); t.objectStore("kv").put(wartosc, klucz); t.oncomplete = ok; t.onerror = () => zle(t.error); });
   } catch (e) { console.warn("IndexedDB", e); }
 }
-async function idbUsun(klucz) {
+export async function idbKlucze(prefiks) {
+  try {
+    const db = await baza();
+    const wszystkie = await new Promise((ok, zle) => { const r = db.transaction("kv").objectStore("kv").getAllKeys(); r.onsuccess = () => ok(r.result); r.onerror = () => zle(r.error); });
+    return wszystkie.filter((k) => typeof k === "string" && k.startsWith(prefiks));
+  } catch { return []; }
+}
+export async function idbUsun(klucz) {
   try {
     const db = await baza();
     await new Promise((ok) => { const t = db.transaction("kv", "readwrite"); t.objectStore("kv").delete(klucz); t.oncomplete = ok; t.onerror = ok; });
