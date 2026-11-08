@@ -2,7 +2,7 @@ import { Mapa, atomNaTekst } from "./dmm.js";
 import { ikona } from "./dmi.js";
 import { wczytajTypy, wszystkie, zmienne, ileUzyc, korzen, zmienneAtomu } from "./typy.js";
 import { Widok, ikonkaTypu, kolorObszaru, warstwaAtomu } from "./render.js";
-import { nowyAtom, poPostawieniu, mozna, poRozbiorce, bezAtomu, obrocony, obrot, Historia } from "./edycja.js";
+import { nowyAtom, poPostawieniu, mozna, poRozbiorce, bezAtomu, obrocony, obrot, obroconySchowek, Historia } from "./edycja.js";
 import { autolacz, laczySie } from "./polaczenia.js";
 import { initSamouczek, zdarzenie, pokazSamouczek } from "./samouczek.js";
 import { zrodlo, ustawZrodlo, ZrodloFolder, ZrodloPliki, ZrodloSerwer, ZrodloGithub, idbPobierz, idbZapisz, idbUsun, idbKlucze } from "./zrodlo.js";
@@ -764,14 +764,14 @@ function wykonaj() {
       if (!s || !s.kafelki.length) { komunikat("Nic do przeniesienia"); return; }
       const x0 = Math.min(...pola.map((p) => p.x)), y0 = Math.min(...pola.map((p) => p.y));
       n.chwyt = { schowek: s, x0, y0, ux: stan.kursor.x - x0, uy: stan.kursor.y - y0 };
-      komunikat("Podniesiono fragment. Kliknij w nowe miejsce, PPM anuluje.");
+      komunikat("Podniesiono fragment. Kliknij w nowe miejsce, Q/E obraca, PPM anuluje.");
       widok.rysuj();
       return;
     }
     // drugi krok: źródło staje się kosmosem, fragment ląduje pod kursorem (razem z obszarami)
     const c = n.chwyt;
     historia.zacznij();
-    for (const t of c.schowek.kafelki) {
+    for (const t of (c.zrodlo || c.schowek).kafelki) {
       const x = c.x0 + t.dx, y = c.y0 + t.dy;
       zmienKafelek(x, y, [{ typ: KOSMOS, zm: [] }, { typ: "/area/space", zm: [] }]);
     }
@@ -901,7 +901,7 @@ widok.nakladki.push((g, w) => {
   if (n.rodzaj === "przenies" && n.chwyt) {
     // miejsce, z którego fragment zniknie
     g.fillStyle = "rgba(10,12,14,0.6)";
-    for (const t of n.chwyt.schowek.kafelki) {
+    for (const t of (n.chwyt.zrodlo || n.chwyt.schowek).kafelki) {
       const p = w.naEkran(n.chwyt.x0 + t.dx, n.chwyt.y0 + t.dy);
       g.fillRect(p.sx, p.sy, z, z);
     }
@@ -1177,9 +1177,9 @@ function pokazPodpowiedz(e) {
   if (n.rodzaj === "rozbiorka") tekst = e.shiftKey ? "Rozbiórka + Shift – usuwa wszystko, zostaje sam kosmos" : "Rozbiórka – usuwa obiekty, ściany zostają poszyciem · z Shiftem: wszystko do kosmosu";
   else if (n.rodzaj === "kopiuj") tekst = "Kopiuj – zaznacz prostokąt";
   else if (n.rodzaj === "zaznacz") tekst = "Zaznacz obszar dla szukania i zamiany – przeciągnij";
-  else if (n.rodzaj === "przenies") tekst = n.chwyt ? "Przenieś – kliknij w nowe miejsce (PPM anuluje)" : "Przenieś – zaznacz prostokąt do przeniesienia";
+  else if (n.rodzaj === "przenies") tekst = n.chwyt ? "Przenieś – kliknij w nowe miejsce, Q/E obraca (PPM anuluje)" : "Przenieś – zaznacz prostokąt do przeniesienia";
   else if (n.rodzaj === "podloga") tekst = "Usuń podłogę – przeciągnij; podłoga zamienia się w kosmos, obiekty zostają";
-  else if (n.rodzaj === "wklej") tekst = `Wklej ${n.schowek.szer}×${n.schowek.wys}${n.nazwa ? " „" + n.nazwa + "”" : ""} – kursor to lewy górny róg`;
+  else if (n.rodzaj === "wklej") tekst = `Wklej ${n.schowek.szer}×${n.schowek.wys}${n.nazwa ? " „" + n.nazwa + "”" : ""} – kursor to lewy górny róg, Q/E obraca`;
   else if (n.rodzaj === "pokoj") tekst = `Pokój – ${ladnaNazwa(stan.ostatnie.sciana)} + ${ladnaNazwa(stan.ostatnie.podloga)} (ostatnio wybrane w Architekcie)`;
   else {
     const kier = { 1: "północ", 2: "południe", 4: "wschód", 8: "zachód", 5: "pn-wsch", 6: "pd-wsch", 9: "pn-zach", 10: "pd-zach" }[stan.kierunek] || stan.kierunek;
@@ -1429,11 +1429,45 @@ function petlaRuchu() {
   requestAnimationFrame(petlaRuchu);
 }
 
+// Q/E: obrót tego, co jest „w ręce” – fragmentu do wklejenia lub przeniesienia, budowanego obiektu,
+// a bez narzędzia obiektu zaznaczonego w Inspekcji.
+function obroc(zmiana) {
+  const n = stan.narzedzie;
+  if (n?.rodzaj === "wklej") {
+    const s = obroconySchowek(n.schowek, zmiana);
+    if (n.schowek === stan.schowek) ustawSchowek(s);
+    n.schowek = s;
+  } else if (n?.rodzaj === "przenies" && n.chwyt) {
+    const c = n.chwyt;
+    c.zrodlo ??= c.schowek;
+    const s = obroconySchowek(c.schowek, zmiana, { x: c.ux, y: c.uy });
+    c.schowek = s;
+    c.ux = s.pkt.x; c.uy = s.pkt.y;
+  } else if (!n && stan.wybrany) {
+    const w = stan.wybrany;
+    const indeks = obiektDoZlapania(w.x, w.y);
+    if (indeks < 0) return;
+    const nowe = obrocony(stan.mapa.atomy(w.x, w.y, widok.z), indeks, zmiana);
+    if (!nowe) return;
+    historia.zacznij(); zmienKafelek(w.x, w.y, nowe); historia.zakoncz(); ustawZmiany(true); pokazInspekcje();
+  } else {
+    stan.kierunek = obrot(stan.kierunek, zmiana);
+  }
+  zdarzenie("obrot");
+  pokazPodpowiedz(ostatniaMysz);
+  widok.rysuj();
+}
+
 window.addEventListener("keydown", (e) => {
-  if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT" || e.target.closest?.("#okno-dialog")) {
-    if (e.key === "Escape") e.target.blur();
+  // Skróty nie działają tylko przy pisaniu. Kliknięty checkbox albo przycisk nie może ich blokować.
+  const cel = e.target;
+  const pisanie = cel.tagName === "TEXTAREA" || cel.tagName === "SELECT" || cel.isContentEditable
+    || (cel.tagName === "INPUT" && !["checkbox", "radio", "button", "range", "color", "file"].includes(cel.type));
+  if (pisanie || cel.closest?.("#okno-dialog")) {
+    if (e.key === "Escape") cel.blur();
     return;
   }
+  if (cel.tagName === "INPUT") cel.blur();
   const k = e.key.toLowerCase();
   if (e.ctrlKey && k === "s") { e.preventDefault(); zapisz(); return; }
   if (e.ctrlKey && k === "z") { e.preventDefault(); e.shiftKey ? ponow() : cofnij(); return; }
@@ -1462,7 +1496,7 @@ window.addEventListener("keydown", (e) => {
     e.preventDefault();
     return;
   }
-  if (k === "q" || k === "e") { stan.kierunek = obrot(stan.kierunek, k === "e" ? 1 : -1); zdarzenie("obrot"); pokazPodpowiedz(ostatniaMysz); widok.rysuj(); }
+  if (k === "q" || k === "e") obroc(k === "e" ? 1 : -1);
   else if (k === "shift") { pokazPodpowiedz(ostatniaMysz); widok.rysuj(); }
   else if (k === "escape") { if (stan.chwyt) anulujChwyt(); else if (stan.narzedzie) anulujNarzedzie(); else { stan.wybrany = null; pokazInspekcje(); widok.rysuj(); } }
   else if (k === "pageup") ustawPoziom(widok.z + 1);

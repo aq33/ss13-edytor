@@ -108,7 +108,7 @@ class Obsluga(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"   # połączenia keep-alive – ikon są setki
 
     def log_message(self, fmt, *args):
-        if "/repo/" in (args[0] if args else ""):
+        if "/repo/" in str(args[0] if args else ""):
             return
         sys.stderr.write("%s\n" % (fmt % args))
 

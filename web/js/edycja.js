@@ -1,6 +1,6 @@
 // Operacje na kafelkach z historią do cofania.
 
-import { zmienne, korzen } from "./typy.js";
+import { zmienne, korzen, istnieje } from "./typy.js";
 import { atomNaTekst } from "./dmm.js";
 
 export const PODLOZE_PO_ROZBIORCE = "/turf/open/floor/plating";
@@ -96,6 +96,71 @@ export function obrot(kier, zmiana) {
   const i = KOLO.indexOf(kier);
   if (i < 0) return 2;
   return KOLO[(i + 2 * zmiana + 8) % 8];
+}
+
+// ---------------------------------------------------------------- obrót fragmentu (wklejanie, szablony, przenoszenie)
+
+const NAZWA_KIER = { 1: "north", 2: "south", 4: "east", 8: "west" };
+const KIER_NAZWY = { north: 1, south: 2, east: 4, west: 8 };
+
+function obroconyAtom(a, zmiana) {
+  if (jestObszar(a)) return a;
+  // podtyp kierunkowy (…/directional/north, …/north) zamieniam na obrócony, jeśli taki istnieje
+  let typ = a.typ;
+  const m = /\/(north|south|east|west)$/.exec(typ);
+  if (m) {
+    const kand = typ.slice(0, m.index + 1) + NAZWA_KIER[obrot(KIER_NAZWY[m[1]], zmiana)];
+    if (istnieje(kand)) typ = kand;
+  }
+  const zm = a.zm.map((e) => [...e]);
+  // Jawne zmienne zostają na swoich miejscach (mniej zmian w diffie), nowe trafiają na miejsce alfabetyczne.
+  // dir: podłoga i luźne przedmioty bez jawnego dir zostają bez niego (wyglądają tak samo), reszta obraca się zawsze.
+  const jawnyDir = zm.find(([k]) => k === "dir");
+  if (jawnyDir) jawnyDir[1] = String(obrot(+jawnyDir[1], zmiana));
+  else if (!(jestTurf(a) || a.typ.startsWith("/obj/item"))) {
+    const kier = obrot(zmienne(a.typ).dir | 0 || 2, zmiana);
+    if (kier !== (zmienne(typ).dir | 0 || 2)) {
+      const j = zm.findIndex(([n]) => n > "dir");
+      zm.splice(j < 0 ? zm.length : j, 0, ["dir", String(kier)]);
+    }
+  }
+  // Przesunięcie w pikselach obraca się z kafelkiem (y w BYOND rośnie w górę): w prawo (x, y) -> (y, -x).
+  // Wpis zmienia oś w miejscu, więc kolejność zmiennych zostaje.
+  const minus = (v) => (isFinite(+v) && v.trim() !== "" ? String(-v || 0) : v);
+  for (const e of zm) {
+    if (e[0] === "pixel_x") { e[0] = "pixel_y"; if (zmiana > 0) e[1] = minus(e[1]); }
+    else if (e[0] === "pixel_y") { e[0] = "pixel_x"; if (zmiana < 0) e[1] = minus(e[1]); }
+  }
+  // stare kable: icon_state "1-4" to kierunki końcówek
+  const ikona = zm.find(([k]) => k === "icon_state");
+  const stanIkony = ikona && /^"?(\d+(?:-\d+)*)"?$/.exec(ikona[1]);
+  if (stanIkony && typ.startsWith("/obj/structure/cable")) {
+    const czesci = stanIkony[1].split("-").map((d) => (+d ? obrot(+d, zmiana) : 0)).sort((p, q) => p - q);
+    ikona[1] = `"${czesci.join("-")}"`;
+  }
+  return { typ, zm };
+}
+
+// Obraca skopiowany fragment o 90° (zmiana = +1 zgodnie ze wskazówkami zegara).
+// Każdy obrót liczę od oryginału, więc cztery obroty albo E i Q dają dokładnie ten sam tekst co na mapie.
+// pkt: opcjonalny punkt chwytu {x, y} w układzie fragmentu, obracany razem z nim.
+export function obroconySchowek(s, zmiana, pkt = null) {
+  const baza = s.oryginal || s;
+  const ile = (((s.obrot || 0) + zmiana) % 4 + 4) % 4;
+  let wynik = { szer: baza.szer, wys: baza.wys, kafelki: baza.kafelki };
+  for (let i = 0; i < ile; i++) {
+    const w = wynik.szer;
+    wynik = {
+      szer: wynik.wys, wys: w,
+      kafelki: wynik.kafelki.map((t) => ({ dx: t.dy, dy: w - 1 - t.dx, atomy: t.atomy.map((a) => obroconyAtom(a, 1)) })),
+    };
+  }
+  if (!ile) wynik = { ...baza };
+  // ukryte pola: nie trafiają do szablonu zapisanego jako JSON
+  Object.defineProperty(wynik, "oryginal", { value: baza, enumerable: false, configurable: true });
+  Object.defineProperty(wynik, "obrot", { value: ile, enumerable: false, configurable: true });
+  if (pkt) wynik.pkt = zmiana > 0 ? { x: pkt.y, y: s.szer - 1 - pkt.x } : { x: s.wys - 1 - pkt.y, y: pkt.x };
+  return wynik;
 }
 
 export class Historia {
